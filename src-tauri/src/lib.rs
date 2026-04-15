@@ -10,6 +10,13 @@ use tauri::Manager;
 const ENV_CHILD_EXE: &str = "BACKEND_EXECUTABLE";
 /// Базовый HTTP URL, на котором дочерний процесс должен слушать (читает сам процесс — формат на его стороне).
 const ENV_CHILD_HTTP_BASE: &str = "BACKEND_HTTP_BASE_URL";
+/// Путь внутри ресурсов Tauri, куда кладется self-contained backend для production-сборки.
+#[cfg(target_os = "windows")]
+const BUNDLED_CHILD_RELATIVE_PATH: &str = "binaries/backend/win-x64/Backend.API.exe";
+
+/// Linux bundle (`build:linux-x64`). На других не-Windows таргетах тот же layout — при необходимости задайте `BACKEND_EXECUTABLE`.
+#[cfg(not(target_os = "windows"))]
+const BUNDLED_CHILD_RELATIVE_PATH: &str = "binaries/backend/linux-x64/Backend.API";
 
 struct LocalChildState {
     base_url: String,
@@ -88,29 +95,46 @@ fn get_backend_base_url(state: tauri::State<'_, LocalChildState>) -> String {
     state.base_url.clone()
 }
 
-fn resolve_child_executable() -> Result<PathBuf, String> {
-    std::env::var(ENV_CHILD_EXE)
-        .map_err(|_| {
-            format!(
-                "Environment variable {ENV_CHILD_EXE} is not set. \
-                 Point it at your built server binary (e.g. VS Code launch + preLaunchTask)."
-            )
-        })
-        .map(PathBuf::from)
-        .and_then(|p| {
-            if p.is_file() {
-                Ok(p)
-            } else {
-                Err(format!(
-                    "{ENV_CHILD_EXE} does not refer to a file: {}",
-                    p.display()
-                ))
-            }
-        })
+fn resolve_child_executable(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    if let Ok(raw_path) = std::env::var(ENV_CHILD_EXE) {
+        let env_path = PathBuf::from(raw_path);
+        if env_path.is_file() {
+            return Ok(env_path);
+        }
+        return Err(format!(
+            "{ENV_CHILD_EXE} does not refer to a file: {}",
+            env_path.display()
+        ));
+    }
+
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("Failed to resolve Tauri resource dir: {e}"))?;
+    let bundled_path = resource_dir.join(BUNDLED_CHILD_RELATIVE_PATH);
+    if bundled_path.is_file() {
+        return Ok(bundled_path);
+    }
+
+    let portable_path = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|dir| dir.to_path_buf()))
+        .map(|dir| dir.join(BUNDLED_CHILD_RELATIVE_PATH));
+    if let Some(path) = portable_path {
+        if path.is_file() {
+            return Ok(path);
+        }
+    }
+
+    Err(format!(
+        "Backend executable was not found. Either set {ENV_CHILD_EXE} for development \
+         or include bundled backend at '{}'.",
+        BUNDLED_CHILD_RELATIVE_PATH
+    ))
 }
 
-fn spawn_child_process(base_url: &str) -> Result<Child, String> {
-    let exe_path = resolve_child_executable()?;
+fn spawn_child_process(app: &tauri::AppHandle, base_url: &str) -> Result<Child, String> {
+    let exe_path = resolve_child_executable(app)?;
     let workdir = exe_path
         .parent()
         .ok_or_else(|| "executable path has no parent directory".to_string())?
@@ -144,7 +168,7 @@ pub fn run() {
             let port = pick_free_port()?;
             let base_url = format!("http://127.0.0.1:{port}");
 
-            let child = spawn_child_process(&base_url)?;
+            let child = spawn_child_process(&_app.handle(), &base_url)?;
             wait_for_health(&base_url)?;
 
             _app.manage(LocalChildState {

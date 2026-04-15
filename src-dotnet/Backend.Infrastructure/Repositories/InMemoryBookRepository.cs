@@ -11,6 +11,7 @@ public sealed class InMemoryBookRepository : IBookRepository
         new(2, "Clean Code", "Robert C. Martin", 2008),
         new(3, "Design Patterns", "Gang of Four", 1994),
         new(4, "Design Patterns", "Gang of Four", 1994),
+        new(5, "Design Pфвфвatterns", "Gang of Four", 1994),
     ];
 
     public Task<IReadOnlyList<Book>> GetAllAsync(CancellationToken cancellationToken)
