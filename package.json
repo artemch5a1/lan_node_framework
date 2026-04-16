@@ -5,7 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "npm run build:web",
+    "build:web": "tsc && vite build",
+    "build:backend:win-x64": "dotnet publish ./src-dotnet/Backend.API/Backend.API.csproj -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true -o ./src-tauri/binaries/backend/win-x64",
+    "build:backend:linux-x64": "dotnet publish ./src-dotnet/Backend.API/Backend.API.csproj -c Release -r linux-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true -o ./src-tauri/binaries/backend/linux-x64",
+    "build:bundle:win-x64": "npm run build:web && npm run build:backend:win-x64",
+    "build:bundle:linux-x64": "npm run build:web && npm run build:backend:linux-x64",
+    "build:win-x64": "npm run build:bundle:win-x64 && npm run tauri build -- --target x86_64-pc-windows-msvc --config src-tauri/tauri.bundle.windows.json",
+    "build:linux-x64": "npm run build:bundle:linux-x64 && npm run tauri build -- --config src-tauri/tauri.bundle.linux.json",
     "preview": "vite preview",
     "tauri": "tauri"
   },

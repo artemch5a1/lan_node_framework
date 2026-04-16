@@ -29,7 +29,6 @@ src-tauri/target/
 
 # IDE and OS files
 .idea/
-.vscode/
 .vs/
 *.suo
 *.user
@@ -37,3 +36,5 @@ src-tauri/target/
 *.sln.docstates
 .DS_Store
 Thumbs.db
+/src-tauri/gen
+/src-tauri/binaries

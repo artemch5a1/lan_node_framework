@@ -2,11 +2,11 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "op-1-26_non-standard_situations",
   "version": "0.1.0",
-  "identifier": "com.op-1-26_non-standard_situations.app",
+  "identifier": "com.op-1-26-non-standard-situations.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "npm run build:web",
     "frontendDist": "../dist"
   },
   "app": {

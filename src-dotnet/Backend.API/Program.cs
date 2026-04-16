@@ -1,4 +1,6 @@
 using System.Net;
+using Backend.Application;
+using Backend.Infrastructure;
 using DistributedLocalSystem.Core;
 
 static string ResolveLocalHttpUrl(string[] args)
@@ -26,6 +28,8 @@ static string ResolveLocalHttpUrl(string[] args)
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDistributedLocalSystemCore(builder.Configuration);
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure();
 builder.Services.AddControllers();
 
 string localHttpUrl = ResolveLocalHttpUrl(args);
