@@ -29,7 +29,6 @@ src-tauri/target/
 
 # IDE and OS files
 .idea/
-.vscode/
 .vs/
 *.suo
 *.user
