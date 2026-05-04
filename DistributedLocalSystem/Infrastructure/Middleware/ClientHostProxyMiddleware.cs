@@ -1,11 +1,6 @@
-using System.Collections.Generic;
-using System.IO;
-using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Text.Json;
+using DistributedLocalSystem.Core.Infrastructure.Attributes;
 using DistributedLocalSystem.Core.NetDiscovery;
-using Microsoft.AspNetCore.Http.Json;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 
 namespace DistributedLocalSystem.Core.Middleware;
@@ -57,40 +52,11 @@ public sealed class ClientHostProxyMiddleware
 
     public async Task InvokeAsync(HttpContext context, NetDiscoveryService net)
     {
-        if (context.Request.Path.StartsWithSegments("/api/net/status"))
-        {
-            NetStatusDto status = net.GetStatus();
-            context.Response.ContentType = "application/json";
-            JsonSerializerOptions jsonOptions = context
-                .RequestServices.GetRequiredService<IOptions<JsonOptions>>()
-                .Value.SerializerOptions;
+        Endpoint? endpoint = context.GetEndpoint();
 
-            await JsonSerializer
-                .SerializeAsync(context.Response.Body, status, jsonOptions, context.RequestAborted)
-                .ConfigureAwait(false);
-            return;
-        }
+        bool hasAttribute = endpoint?.Metadata.GetMetadata<NotRedirect>() != null;
 
-        if (context.Request.Path.StartsWithSegments("/api/net/role"))
-        {
-            NetStatusDto status = net.GetStatus();
-            context.Response.ContentType = "application/json";
-            JsonSerializerOptions jsonOptions = context
-                .RequestServices.GetRequiredService<IOptions<JsonOptions>>()
-                .Value.SerializerOptions;
-
-            await JsonSerializer
-                .SerializeAsync(
-                    context.Response.Body,
-                    new { role = status.ConfiguredRole },
-                    jsonOptions,
-                    context.RequestAborted
-                )
-                .ConfigureAwait(false);
-            return;
-        }
-
-        if (ShouldBypass(context.Request.Path))
+        if (hasAttribute)
         {
             await _next(context).ConfigureAwait(false);
             return;
@@ -118,14 +84,6 @@ public sealed class ClientHostProxyMiddleware
                 .Response.WriteAsync("Bad gateway: host unreachable.", context.RequestAborted)
                 .ConfigureAwait(false);
         }
-    }
-
-    /// <summary>Пути, которые всегда обрабатывает локальный процесс (клиентский UI / управление).</summary>
-    internal static bool ShouldBypass(PathString path)
-    {
-        if (path.StartsWithSegments("/health"))
-            return true;
-        return false;
     }
 
     private static Uri BuildTargetUri(HttpRequest request, string remoteBase)

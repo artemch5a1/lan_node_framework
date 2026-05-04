@@ -2,6 +2,7 @@ using System.Net;
 using Backend.Application;
 using Backend.Infrastructure;
 using DistributedLocalSystem.Core;
+using DistributedLocalSystem.Core.Infrastructure.Attributes;
 
 static string ResolveLocalHttpUrl(string[] args)
 {
@@ -56,6 +57,6 @@ app.MapGet(
     }
 );
 
-app.MapGet("/health", () => Results.Text("OK"));
+app.MapGet("/health", () => Results.Text("OK")).WithMetadata(new NotRedirect());
 
 app.Run();
