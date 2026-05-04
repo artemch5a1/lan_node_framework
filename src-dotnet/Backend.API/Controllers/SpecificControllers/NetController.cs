@@ -21,7 +21,7 @@ public class NetController : ControllerBase
     [HttpGet("status")]
     public async Task GetStatus(CancellationToken cancellationToken)
     {
-        var status = _netService.GetStatus();
+        NetStatusDto status = _netService.GetStatus();
         Response.ContentType = "application/json";
 
         await JsonSerializer.SerializeAsync(
@@ -35,7 +35,7 @@ public class NetController : ControllerBase
     [HttpGet("role")]
     public async Task GetRole(CancellationToken cancellationToken)
     {
-        var status = _netService.GetStatus();
+        NetStatusDto status = _netService.GetStatus();
         Response.ContentType = "application/json";
 
         await JsonSerializer.SerializeAsync(
