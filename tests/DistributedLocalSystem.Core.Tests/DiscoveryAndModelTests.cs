@@ -10,6 +10,26 @@ namespace DistributedLocalSystem.Core.Tests;
 public class DiscoveryAndModelTests
 {
     [Fact]
+    public void DiscoveryServiceIdentity_MatchesOnlySameAdvertisedName()
+    {
+        DiscoveryServiceIdentity id = DiscoveryServiceIdentity.FromConfiguredAppId("my-app");
+
+        Assert.True(id.MatchesPeerAdvertisedName("my-app"));
+        Assert.False(id.MatchesPeerAdvertisedName("other-app"));
+        Assert.False(id.MatchesPeerAdvertisedName("MY-APP"));
+        Assert.False(id.MatchesPeerAdvertisedName(null));
+    }
+
+    [Fact]
+    public void DiscoveryServiceIdentity_FromConfiguredAppId_TrimsWhitespace()
+    {
+        DiscoveryServiceIdentity id = DiscoveryServiceIdentity.FromConfiguredAppId("  x  ");
+
+        Assert.Equal("x", id.ExpectedServiceName);
+        Assert.True(id.MatchesPeerAdvertisedName("x"));
+    }
+
+    [Fact]
     public void ParseRole_ReturnsHost_ForHostValue()
     {
         NetConfiguredRole role = DiscoveryOptions.ParseRole("host");
@@ -130,8 +150,10 @@ public class DiscoveryAndModelTests
 
     private static NetDiscoveryService CreateService(DiscoveryOptions? options = null)
     {
+        DiscoveryOptions o = options ?? new DiscoveryOptions();
         return new NetDiscoveryService(
-            Options.Create(options ?? new DiscoveryOptions()),
+            Options.Create(o),
+            DiscoveryServiceIdentity.FromConfiguredAppId(o.AppId),
             NullLogger<NetDiscoveryService>.Instance
         );
     }
