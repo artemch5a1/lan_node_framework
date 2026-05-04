@@ -11,6 +11,7 @@
   </ItemGroup>
   <!--
     Ориентация по папкам:
+    Abstractions/           — контракты (порты): репозиторий настроек, перезагрузка конфигурации
     Bootstrap/              — регистрация DI и расширения IApplicationBuilder
     NetDiscovery/           — фича LAN discovery (UDP, роль host/client)
       Model/                — DTO и настройки: DiscoveryOptions, состояние, NetStatusDto
@@ -18,7 +19,7 @@
       Runtime/              — NetDiscoveryService, NetDiscoveryHostedService
       Configuration/        — перезагрузка настроек из БД (INetDiscoveryConfigurationReloadCoordinator)
     Infrastructure/         — внешние зависимости
-      Persistence/          — SQLite, EF, репозиторий настроек
+      Persistence/          — SQLite, EF, реализации репозитория
       Udp/                  — обёртки UdpDiscovery.Net
       Middleware/           — HTTP-прокси на LAN-хост
     Properties/             — InternalsVisibleTo и т.п.

@@ -1,4 +1,4 @@
-using DistributedLocalSystem.Core.Persistence.Abstractions;
+using DistributedLocalSystem.Core.Abstractions;
 
 namespace DistributedLocalSystem.Core.NetDiscovery;
 

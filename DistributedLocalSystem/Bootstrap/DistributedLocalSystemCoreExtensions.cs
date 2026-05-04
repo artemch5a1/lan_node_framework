@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 using DistributedLocalSystem.Core.Middleware;
 using DistributedLocalSystem.Core.NetDiscovery;
 using DistributedLocalSystem.Core.Persistence;
-using DistributedLocalSystem.Core.Persistence.Abstractions;
+using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.Persistence.Repositories;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Json;

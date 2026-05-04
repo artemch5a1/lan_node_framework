@@ -1,6 +1,6 @@
 using DistributedLocalSystem.Core.NetDiscovery;
 
-namespace DistributedLocalSystem.Core.Persistence.Abstractions;
+namespace DistributedLocalSystem.Core.Abstractions;
 
 /// <summary>Единственный источник настроек LAN discovery: SQLite + потокобезопасный снимок после чтения БД.</summary>
 public interface INetDiscoverySettingsRepository

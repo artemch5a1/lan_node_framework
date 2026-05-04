@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
-using DistributedLocalSystem.Core.Persistence.Abstractions;
+using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.Udp;
 using UdpDiscovery.Net;
 

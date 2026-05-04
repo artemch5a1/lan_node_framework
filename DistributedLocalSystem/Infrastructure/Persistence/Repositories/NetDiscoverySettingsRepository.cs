@@ -1,5 +1,5 @@
 using DistributedLocalSystem.Core.NetDiscovery;
-using DistributedLocalSystem.Core.Persistence.Abstractions;
+using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
