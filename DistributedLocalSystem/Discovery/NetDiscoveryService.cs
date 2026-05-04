@@ -19,6 +19,7 @@ public sealed class NetDiscoveryService : IDisposable
 
     private readonly DiscoveryOptions _opt;
     private readonly IOptions<DiscoveryOptions> _options;
+    private readonly DiscoveryServiceIdentity _localIdentity;
     private readonly ILogger<NetDiscoveryService> _log;
     private readonly object _gate = new();
 
@@ -34,10 +35,15 @@ public sealed class NetDiscoveryService : IDisposable
     private string? _thisHostIp;
 
     /// <summary>Настройки из <see cref="IOptions{T}"/>.</summary>
-    public NetDiscoveryService(IOptions<DiscoveryOptions> options, ILogger<NetDiscoveryService> log)
+    public NetDiscoveryService(
+        IOptions<DiscoveryOptions> options,
+        DiscoveryServiceIdentity localIdentity,
+        ILogger<NetDiscoveryService> log
+    )
     {
         _opt = options.Value;
         _options = options;
+        _localIdentity = localIdentity;
         _log = log;
     }
 
@@ -84,7 +90,7 @@ public sealed class NetDiscoveryService : IDisposable
             _runCts = new CancellationTokenSource();
             CancellationToken token = _runCts.Token;
 
-            _hostAnnouncer = new ApiUdpAnnouncer(_options);
+            _hostAnnouncer = new ApiUdpAnnouncer(_options, _localIdentity);
             _hostAnnouncer.StartAsync(token).GetAwaiter().GetResult();
 
             _runTask = Task.Run(
@@ -108,7 +114,7 @@ public sealed class NetDiscoveryService : IDisposable
     /// </summary>
     private bool DetectExistingHostBeforeBeaconStart()
     {
-        using UdpDiscoveryService probe = new(_options);
+        using UdpDiscoveryService probe = new(_options, _localIdentity);
         using CancellationTokenSource timeoutCts = new(
             TimeSpan.FromMilliseconds(_opt.DiscoveryTimeoutMs)
         );
@@ -166,7 +172,7 @@ public sealed class NetDiscoveryService : IDisposable
             _runCts = new CancellationTokenSource();
             CancellationToken token = _runCts.Token;
 
-            UdpDiscoveryService discovery = new(_options);
+            UdpDiscoveryService discovery = new(_options, _localIdentity);
             _clientDiscovery = discovery;
 
             TaskCompletionSource<DiscoveredServer> tcs = new(

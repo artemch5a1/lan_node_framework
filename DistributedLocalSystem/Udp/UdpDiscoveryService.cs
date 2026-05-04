@@ -6,7 +6,7 @@ namespace DistributedLocalSystem.Core.Udp;
 
 public sealed class UdpDiscoveryService : IHostedService, IDisposable
 {
-    private readonly string _serviceName;
+    private readonly DiscoveryServiceIdentity _localIdentity;
 
     public event Action<DiscoveredServer>? ServerDiscovered;
     public event Action<DiscoveredServer>? ServerLost;
@@ -18,9 +18,12 @@ public sealed class UdpDiscoveryService : IHostedService, IDisposable
     private CancellationTokenSource? _cancellationTokenSource;
     private Task? _discoveryTask;
 
-    public UdpDiscoveryService(IOptions<DiscoveryOptions> options)
+    public UdpDiscoveryService(
+        IOptions<DiscoveryOptions> options,
+        DiscoveryServiceIdentity localIdentity
+    )
     {
-        _serviceName = options.Value.AppId;
+        _localIdentity = localIdentity;
         _serverDiscoveryService = new ServerDiscoveryService(
             discoveryPort: (ushort)options.Value.UdpPort
         );
@@ -66,7 +69,7 @@ public sealed class UdpDiscoveryService : IHostedService, IDisposable
     {
         _serverDiscoveryService.OnServerDiscovered += (server) =>
         {
-            if (!string.Equals(server.Name, _serviceName, StringComparison.Ordinal))
+            if (!_localIdentity.MatchesPeerAdvertisedName(server.Name))
                 return;
 
             LastDiscoveredServerIp = server.IpAddress.ToString();
@@ -75,7 +78,7 @@ public sealed class UdpDiscoveryService : IHostedService, IDisposable
 
         _serverDiscoveryService.OnServerDisappeared += (server) =>
         {
-            if (!string.Equals(server.Name, _serviceName, StringComparison.Ordinal))
+            if (!_localIdentity.MatchesPeerAdvertisedName(server.Name))
                 return;
 
             ServerLost?.Invoke(server);

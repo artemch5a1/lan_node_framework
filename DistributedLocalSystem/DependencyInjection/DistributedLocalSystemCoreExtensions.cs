@@ -23,6 +23,12 @@ public static class DistributedLocalSystemCoreExtensions
             configuration.GetSection(DiscoveryOptions.SectionName)
         );
 
+        services.AddSingleton(static sp =>
+            DiscoveryServiceIdentity.FromConfiguredAppId(
+                sp.GetRequiredService<IOptions<DiscoveryOptions>>().Value.AppId
+            )
+        );
+
         services.AddSingleton<NetDiscoveryService>();
         services.AddHostedService<NetDiscoveryHostedService>();
 

@@ -9,11 +9,13 @@ public class ApiUdpAnnouncer : IDisposable
     private CancellationTokenSource? _broadcastCts;
     private Task? _broadcastTask;
 
-    public ApiUdpAnnouncer(IOptions<DiscoveryOptions> options)
+    public ApiUdpAnnouncer(
+        IOptions<DiscoveryOptions> options,
+        DiscoveryServiceIdentity localIdentity
+    )
     {
-        string serviceName = options.Value.AppId;
         _udpBroadcaster = new UdpDiscovery.Net.UdpDiscovery(
-            serviceName: serviceName,
+            serviceName: localIdentity.ExpectedServiceName,
             discoveryPort: (ushort)options.Value.UdpPort
         );
     }
