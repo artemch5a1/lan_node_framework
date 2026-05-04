@@ -2,8 +2,8 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
+using DistributedLocalSystem.Core.Persistence.Abstractions;
 using DistributedLocalSystem.Core.Udp;
-using Microsoft.Extensions.Options;
 using UdpDiscovery.Net;
 
 namespace DistributedLocalSystem.Core.Discovery;
@@ -17,8 +17,7 @@ public sealed class NetDiscoveryService : IDisposable
         PropertyNameCaseInsensitive = true,
     };
 
-    private readonly DiscoveryOptions _opt;
-    private readonly IOptions<DiscoveryOptions> _options;
+    private readonly INetDiscoverySettingsRepository _settings;
     private readonly DiscoveryServiceIdentity _localIdentity;
     private readonly ILogger<NetDiscoveryService> _log;
     private readonly object _gate = new();
@@ -34,17 +33,36 @@ public sealed class NetDiscoveryService : IDisposable
     private int? _remoteTcpPort;
     private string? _thisHostIp;
 
-    /// <summary>Настройки из <see cref="IOptions{T}"/>.</summary>
     public NetDiscoveryService(
-        IOptions<DiscoveryOptions> options,
+        INetDiscoverySettingsRepository settings,
         DiscoveryServiceIdentity localIdentity,
         ILogger<NetDiscoveryService> log
     )
     {
-        _opt = options.Value;
-        _options = options;
+        _settings = settings;
         _localIdentity = localIdentity;
         _log = log;
+    }
+
+    /// <summary>
+    /// Останавливает discovery и поднимает режим по актуальным настройкам из репозитория
+    /// (после <see cref="INetDiscoveryConfigurationReloadCoordinator.ReloadAsync"/>).
+    /// </summary>
+    public void RealignWithCurrentConfiguration()
+    {
+        Stop();
+        DiscoveryOptions snap = _settings.GetCurrent();
+        switch (snap.ParsedRole)
+        {
+            case NetConfiguredRole.Host:
+                StartHost();
+                break;
+            case NetConfiguredRole.Client:
+                StartClient();
+                break;
+            default:
+                break;
+        }
     }
 
     /// <summary>Снимок для <c>GET /api/net/status</c>.</summary>
@@ -52,16 +70,17 @@ public sealed class NetDiscoveryService : IDisposable
     {
         lock (_gate)
         {
+            DiscoveryOptions opt = _settings.GetCurrent();
             return new NetStatusDto(
-                ConfiguredRole: NetRoleApi.Format(_opt.ParsedRole),
+                ConfiguredRole: NetRoleApi.Format(opt.ParsedRole),
                 State: _state,
                 ThisHostIp: _thisHostIp,
                 RemoteHostIp: _remoteHostIp,
                 RemoteTcpPort: _remoteTcpPort,
                 RemoteHostBaseUrl: BuildRemoteBaseUrl(),
-                LanPort: _opt.LanPort,
-                UdpPort: _opt.UdpPort,
-                AppId: _opt.AppId
+                LanPort: opt.LanPort,
+                UdpPort: opt.UdpPort,
+                AppId: opt.AppId
             );
         }
     }
@@ -71,13 +90,14 @@ public sealed class NetDiscoveryService : IDisposable
     {
         lock (_gate)
         {
+            DiscoveryOptions opt = _settings.GetCurrent();
             StopUnsafe();
 
-            bool hostAlreadyExists = DetectExistingHostBeforeBeaconStart();
+            bool hostAlreadyExists = DetectExistingHostBeforeBeaconStart(opt);
             if (hostAlreadyExists)
             {
                 string error =
-                    $"Net: another host is already running in LAN for AppId '{_opt.AppId}'. "
+                    $"Net: another host is already running in LAN for AppId '{opt.AppId}'. "
                     + "This instance cannot start in host mode.";
                 _log.LogError(error);
                 throw new InvalidOperationException(error);
@@ -90,7 +110,7 @@ public sealed class NetDiscoveryService : IDisposable
             _runCts = new CancellationTokenSource();
             CancellationToken token = _runCts.Token;
 
-            _hostAnnouncer = new ApiUdpAnnouncer(_options, _localIdentity);
+            _hostAnnouncer = new ApiUdpAnnouncer(_settings, _localIdentity);
             _hostAnnouncer.StartAsync(token).GetAwaiter().GetResult();
 
             _runTask = Task.Run(
@@ -105,18 +125,15 @@ public sealed class NetDiscoveryService : IDisposable
                 token
             );
 
-            _log.LogInformation("Net: host mode, UDP announcement started ({AppId})", _opt.AppId);
+            _log.LogInformation("Net: host mode, UDP announcement started ({AppId})", opt.AppId);
         }
     }
 
-    /// <summary>
-    /// Перед запуском beacon в режиме host проверяем, нет ли уже существующего хоста в локальной сети.
-    /// </summary>
-    private bool DetectExistingHostBeforeBeaconStart()
+    private bool DetectExistingHostBeforeBeaconStart(DiscoveryOptions opt)
     {
-        using UdpDiscoveryService probe = new(_options, _localIdentity);
+        using UdpDiscoveryService probe = new(_settings, _localIdentity);
         using CancellationTokenSource timeoutCts = new(
-            TimeSpan.FromMilliseconds(_opt.DiscoveryTimeoutMs)
+            TimeSpan.FromMilliseconds(opt.DiscoveryTimeoutMs)
         );
 
         TaskCompletionSource<DiscoveredServer> tcs = new(
@@ -134,8 +151,8 @@ public sealed class NetDiscoveryService : IDisposable
             _log.LogInformation(
                 "Net: existing host detected before host startup at {Host}:{Tcp} ({AppId})",
                 discovered.IpAddress,
-                _opt.LanPort,
-                _opt.AppId
+                opt.LanPort,
+                opt.AppId
             );
             return true;
         }
@@ -163,6 +180,7 @@ public sealed class NetDiscoveryService : IDisposable
     {
         lock (_gate)
         {
+            DiscoveryOptions opt = _settings.GetCurrent();
             StopUnsafe();
 
             _state = NetDiscoveryState.ClientDiscovering;
@@ -172,7 +190,7 @@ public sealed class NetDiscoveryService : IDisposable
             _runCts = new CancellationTokenSource();
             CancellationToken token = _runCts.Token;
 
-            UdpDiscoveryService discovery = new(_options, _localIdentity);
+            UdpDiscoveryService discovery = new(_settings, _localIdentity);
             _clientDiscovery = discovery;
 
             TaskCompletionSource<DiscoveredServer> tcs = new(
@@ -180,6 +198,9 @@ public sealed class NetDiscoveryService : IDisposable
             );
 
             discovery.ServerDiscovered += server => tcs.TrySetResult(server);
+
+            int lanPort = opt.LanPort;
+            string appId = opt.AppId;
 
             _runTask = Task.Run(
                 async () =>
@@ -196,14 +217,14 @@ public sealed class NetDiscoveryService : IDisposable
                         {
                             _state = NetDiscoveryState.ClientConnected;
                             _remoteHostIp = server.IpAddress.ToString();
-                            _remoteTcpPort = _opt.LanPort;
+                            _remoteTcpPort = lanPort;
                         }
 
                         _log.LogInformation(
                             "Net: host found at {Host}:{Tcp} ({AppId})",
                             server.IpAddress,
-                            _opt.LanPort,
-                            _opt.AppId
+                            lanPort,
+                            appId
                         );
 
                         await discovery.StopAsync(CancellationToken.None).ConfigureAwait(false);
@@ -219,7 +240,7 @@ public sealed class NetDiscoveryService : IDisposable
 
             _log.LogInformation(
                 "Net: client mode, listening UDP until host found ({AppId})",
-                _opt.AppId
+                opt.AppId
             );
         }
     }
@@ -247,12 +268,13 @@ public sealed class NetDiscoveryService : IDisposable
     /// </summary>
     public void RestartClientDiscoveryAfterRemoteHostFailure()
     {
-        if (_opt.ParsedRole != NetConfiguredRole.Client)
+        DiscoveryOptions snap = _settings.GetCurrent();
+        if (snap.ParsedRole != NetConfiguredRole.Client)
             return;
 
         _log.LogWarning(
             "Net: remote host considered dead; restarting UDP discovery ({AppId})",
-            _opt.AppId
+            snap.AppId
         );
         StartClient();
     }

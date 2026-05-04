@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
     <PackageReference Include="UdpDiscovery.Net" Version="1.2.0" />
   </ItemGroup>
   <!--
@@ -13,6 +14,7 @@
     DependencyInjection/ — вход в библиотеку (AddDistributedLocalSystemCore, UseDistributedLocalSystemCoreProxy)
     Discovery/         — UDP discovery, опции, DTO, статусы, NetDiscoveryService / HostedService
     Middleware/        — ClientHostProxyMiddleware
+    Persistence/       — SQLite, репозиторий настроек LAN
     Udp/               — обёртки UdpDiscovery.Net (клиент/хост)
     GlobalUsings.cs   — общие глобальные using для class library
   -->
