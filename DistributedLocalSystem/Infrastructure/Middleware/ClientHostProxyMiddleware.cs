@@ -3,7 +3,7 @@ using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
-using DistributedLocalSystem.Core.Discovery;
+using DistributedLocalSystem.Core.NetDiscovery;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;

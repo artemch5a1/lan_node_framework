@@ -1,6 +1,6 @@
 using DistributedLocalSystem.Core.Persistence.Abstractions;
 
-namespace DistributedLocalSystem.Core.Discovery;
+namespace DistributedLocalSystem.Core.NetDiscovery;
 
 public sealed class NetDiscoveryConfigurationReloadCoordinator
     : INetDiscoveryConfigurationReloadCoordinator

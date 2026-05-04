@@ -1,22 +1,15 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
-using System.Text.Json;
 using DistributedLocalSystem.Core.Persistence.Abstractions;
 using DistributedLocalSystem.Core.Udp;
 using UdpDiscovery.Net;
 
-namespace DistributedLocalSystem.Core.Discovery;
+namespace DistributedLocalSystem.Core.NetDiscovery;
 
 /// <summary>UDP discovery: хост — beacon, клиент — поиск хоста или <see cref="NetDiscoveryState.ClientLocalOnly"/>.</summary>
 public sealed class NetDiscoveryService : IDisposable
 {
-    private static readonly JsonSerializerOptions JsonOpts = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly INetDiscoverySettingsRepository _settings;
     private readonly DiscoveryServiceIdentity _localIdentity;
     private readonly ILogger<NetDiscoveryService> _log;

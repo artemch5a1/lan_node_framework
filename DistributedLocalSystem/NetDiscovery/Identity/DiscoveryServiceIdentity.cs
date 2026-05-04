@@ -1,6 +1,6 @@
 using DistributedLocalSystem.Core.Persistence.Abstractions;
 
-namespace DistributedLocalSystem.Core.Discovery;
+namespace DistributedLocalSystem.Core.NetDiscovery;
 
 /// <summary>
 /// Идентичность приложения в LAN UDP discovery: то же значение, что <c>serviceName</c> в UdpDiscovery.Net

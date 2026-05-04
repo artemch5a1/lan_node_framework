@@ -1,6 +1,6 @@
 using DistributedLocalSystem.Core.Persistence.Abstractions;
 
-namespace DistributedLocalSystem.Core.Discovery;
+namespace DistributedLocalSystem.Core.NetDiscovery;
 
 /// <summary>Старт/стоп discovery по <see cref="DiscoveryOptions.Role"/> из репозитория настроек.</summary>
 public sealed class NetDiscoveryHostedService : IHostedService

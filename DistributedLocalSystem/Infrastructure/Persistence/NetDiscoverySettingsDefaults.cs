@@ -1,4 +1,4 @@
-using DistributedLocalSystem.Core.Discovery;
+using DistributedLocalSystem.Core.NetDiscovery;
 using DistributedLocalSystem.Core.Persistence.Entities;
 
 namespace DistributedLocalSystem.Core.Persistence;

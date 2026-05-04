@@ -1,4 +1,4 @@
-namespace DistributedLocalSystem.Core.Discovery;
+namespace DistributedLocalSystem.Core.NetDiscovery;
 
 /// <summary>Перечитывает настройки из БД и перестраивает host/client discovery.</summary>
 public interface INetDiscoveryConfigurationReloadCoordinator
