@@ -1,8 +1,7 @@
-using DistributedLocalSystem.Core.NetDiscovery;
 using DistributedLocalSystem.Core.Abstractions;
+using DistributedLocalSystem.Core.NetDiscovery;
 using DistributedLocalSystem.Core.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace DistributedLocalSystem.Core.Persistence.Repositories;
 
@@ -23,6 +22,38 @@ public sealed class NetDiscoverySettingsRepository : INetDiscoverySettingsReposi
     {
         _factory = factory;
         _log = log;
+    }
+
+    public async Task<DiscoveryOptions> UpdateConfiguration(
+        DiscoveryOptions newDiscoveryOptions,
+        CancellationToken cancellationToken = default
+    )
+    {
+        await using DistributedLocalStorageContext db = await _factory
+            .CreateDbContextAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        int count = await db
+            .NetDiscoverySettings.ExecuteUpdateAsync(
+                x =>
+                    x.SetProperty(i => i.AppId, newDiscoveryOptions.AppId)
+                        .SetProperty(i => i.BeaconIntervalMs, newDiscoveryOptions.BeaconIntervalMs)
+                        .SetProperty(
+                            i => i.DiscoveryTimeoutMs,
+                            newDiscoveryOptions.DiscoveryTimeoutMs
+                        )
+                        .SetProperty(i => i.LanPort, newDiscoveryOptions.LanPort)
+                        .SetProperty(i => i.ProtocolVersion, newDiscoveryOptions.ProtocolVersion)
+                        .SetProperty(i => i.Role, newDiscoveryOptions.Role)
+                        .SetProperty(i => i.UdpPort, newDiscoveryOptions.UdpPort),
+                cancellationToken: cancellationToken
+            )
+            .ConfigureAwait(false);
+
+        if (count < 1)
+            throw new Exception("Ошибка обновления данных");
+
+        return await LoadOrSeedAndPublishSnapshotAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task EnsureInitializedAsync(CancellationToken cancellationToken = default)

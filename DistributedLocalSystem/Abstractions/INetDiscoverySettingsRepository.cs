@@ -13,4 +13,9 @@ public interface INetDiscoverySettingsRepository
 
     /// <summary>Перечитывает строку из БД, обновляет снимок. Вызывать после правки БД или из API/UI.</summary>
     Task<DiscoveryOptions> ReloadFromDatabaseAsync(CancellationToken cancellationToken = default);
+
+    Task<DiscoveryOptions> UpdateConfiguration(
+        DiscoveryOptions newDiscoveryOptions,
+        CancellationToken cancellationToken = default
+    );
 }
