@@ -1,28 +1,31 @@
-using Microsoft.Extensions.Options;
+using DistributedLocalSystem.Core.Abstractions;
 
-namespace DistributedLocalSystem.Core.Discovery;
+namespace DistributedLocalSystem.Core.NetDiscovery;
 
-/// <summary>Старт/стоп discovery по <see cref="DiscoveryOptions.Role"/> из конфигурации.</summary>
+/// <summary>Старт/стоп discovery по <see cref="DiscoveryOptions.Role"/> из репозитория настроек.</summary>
 public sealed class NetDiscoveryHostedService : IHostedService
 {
     private readonly NetDiscoveryService _net;
-    private readonly DiscoveryOptions _opt;
+    private readonly INetDiscoverySettingsRepository _settings;
     private readonly ILogger<NetDiscoveryHostedService> _log;
 
     public NetDiscoveryHostedService(
         NetDiscoveryService net,
-        IOptions<DiscoveryOptions> options,
+        INetDiscoverySettingsRepository settings,
         ILogger<NetDiscoveryHostedService> log
     )
     {
         _net = net;
-        _opt = options.Value;
+        _settings = settings;
         _log = log;
     }
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
-        switch (_opt.ParsedRole)
+        await _settings.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+
+        DiscoveryOptions opt = _settings.GetCurrent();
+        switch (opt.ParsedRole)
         {
             case NetConfiguredRole.Host:
                 _net.StartHost();
@@ -36,8 +39,6 @@ public sealed class NetDiscoveryHostedService : IHostedService
                 _log.LogInformation("Net: configured role none — discovery idle");
                 break;
         }
-
-        return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken)

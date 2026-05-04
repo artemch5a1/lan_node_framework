@@ -6,14 +6,23 @@
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
     <PackageReference Include="UdpDiscovery.Net" Version="1.2.0" />
   </ItemGroup>
   <!--
-    Структура каталогов:
-    DependencyInjection/ — вход в библиотеку (AddDistributedLocalSystemCore, UseDistributedLocalSystemCoreProxy)
-    Discovery/         — UDP discovery, опции, DTO, статусы, NetDiscoveryService / HostedService
-    Middleware/        — ClientHostProxyMiddleware
-    Udp/               — обёртки UdpDiscovery.Net (клиент/хост)
-    GlobalUsings.cs   — общие глобальные using для class library
+    Ориентация по папкам:
+    Abstractions/           — контракты (порты): репозиторий настроек, перезагрузка конфигурации
+    Bootstrap/              — регистрация DI и расширения IApplicationBuilder
+    NetDiscovery/           — фича LAN discovery (UDP, роль host/client)
+      Model/                — DTO и настройки: DiscoveryOptions, состояние, NetStatusDto
+      Identity/             — DiscoveryServiceIdentity (AppId / service name)
+      Runtime/              — NetDiscoveryService, NetDiscoveryHostedService
+      Configuration/        — перезагрузка настроек из БД (INetDiscoveryConfigurationReloadCoordinator)
+    Infrastructure/         — внешние зависимости
+      Persistence/          — SQLite, EF, реализации репозитория
+      Udp/                  — обёртки UdpDiscovery.Net
+      Middleware/           — HTTP-прокси на LAN-хост
+    Properties/             — InternalsVisibleTo и т.п.
+    GlobalUsings.cs
   -->
 </Project>

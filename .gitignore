@@ -27,6 +27,11 @@ src-tauri/target/
 **/bin/
 **/obj/
 
+# Local SQLite (DistributedLocalSystem)
+**/distributed-local.db
+**/distributed-local.db-shm
+**/distributed-local.db-wal
+
 # IDE and OS files
 .idea/
 .vs/

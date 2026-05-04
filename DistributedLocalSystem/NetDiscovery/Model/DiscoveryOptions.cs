@@ -1,10 +1,11 @@
-namespace DistributedLocalSystem.Core.Discovery;
+namespace DistributedLocalSystem.Core.NetDiscovery;
 
 public sealed class DiscoveryOptions
 {
+    /// <summary>Логическое имя группы (хранится в SQLite, таблица net_discovery_settings).</summary>
     public const string SectionName = "Net";
 
-    /// <summary>Режим из appsettings: none | host | client (регистр не важен).</summary>
+    /// <summary>Режим из хранилища: none | host | client (регистр не важен).</summary>
     public string Role { get; set; } = "none";
 
     public string AppId { get; set; } = "op1-26";

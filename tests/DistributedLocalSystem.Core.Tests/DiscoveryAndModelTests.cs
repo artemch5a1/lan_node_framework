@@ -1,8 +1,9 @@
 using System.Net;
 using System.Reflection;
-using DistributedLocalSystem.Core.Discovery;
+using DistributedLocalSystem.Core.NetDiscovery;
+using DistributedLocalSystem.Core.Persistence;
+using DistributedLocalSystem.Core.Abstractions;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using UdpDiscovery.Net;
 
 namespace DistributedLocalSystem.Core.Tests;
@@ -151,16 +152,35 @@ public class DiscoveryAndModelTests
     private static NetDiscoveryService CreateService(DiscoveryOptions? options = null)
     {
         DiscoveryOptions o = options ?? new DiscoveryOptions();
+        StubNetDiscoverySettingsRepository stub = new(o);
         return new NetDiscoveryService(
-            Options.Create(o),
-            DiscoveryServiceIdentity.FromConfiguredAppId(o.AppId),
+            stub,
+            DiscoveryServiceIdentity.FromRepository(stub),
             NullLogger<NetDiscoveryService>.Instance
         );
     }
 
+    private sealed class StubNetDiscoverySettingsRepository : INetDiscoverySettingsRepository
+    {
+        private readonly DiscoveryOptions _o;
+
+        public StubNetDiscoverySettingsRepository(DiscoveryOptions o) =>
+            _o = NetDiscoverySettingsDefaults.Clone(o);
+
+        public Task EnsureInitializedAsync(CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public DiscoveryOptions GetCurrent() => NetDiscoverySettingsDefaults.Clone(_o);
+
+        public Task<DiscoveryOptions> ReloadFromDatabaseAsync(
+            CancellationToken cancellationToken = default
+        ) => Task.FromResult(GetCurrent());
+    }
+
     private static void SetPrivateField<T>(object target, string fieldName, T value)
     {
-        FieldInfo? field = target.GetType()
+        FieldInfo? field = target
+            .GetType()
             .GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
 
         Assert.NotNull(field);

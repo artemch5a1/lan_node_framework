@@ -1,11 +1,12 @@
-using DistributedLocalSystem.Core.Discovery;
-using Microsoft.Extensions.Options;
+using DistributedLocalSystem.Core.NetDiscovery;
+using DistributedLocalSystem.Core.Abstractions;
 using UdpDiscovery.Net;
 
 namespace DistributedLocalSystem.Core.Udp;
 
 public sealed class UdpDiscoveryService : IHostedService, IDisposable
 {
+    private readonly INetDiscoverySettingsRepository _settings;
     private readonly DiscoveryServiceIdentity _localIdentity;
 
     public event Action<DiscoveredServer>? ServerDiscovered;
@@ -19,13 +20,14 @@ public sealed class UdpDiscoveryService : IHostedService, IDisposable
     private Task? _discoveryTask;
 
     public UdpDiscoveryService(
-        IOptions<DiscoveryOptions> options,
+        INetDiscoverySettingsRepository settings,
         DiscoveryServiceIdentity localIdentity
     )
     {
+        _settings = settings;
         _localIdentity = localIdentity;
         _serverDiscoveryService = new ServerDiscoveryService(
-            discoveryPort: (ushort)options.Value.UdpPort
+            discoveryPort: (ushort)_settings.GetCurrent().UdpPort
         );
     }
 

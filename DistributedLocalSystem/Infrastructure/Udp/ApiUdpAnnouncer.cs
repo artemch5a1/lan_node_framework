@@ -1,5 +1,5 @@
-using DistributedLocalSystem.Core.Discovery;
-using Microsoft.Extensions.Options;
+using DistributedLocalSystem.Core.NetDiscovery;
+using DistributedLocalSystem.Core.Abstractions;
 
 namespace DistributedLocalSystem.Core.Udp;
 
@@ -10,13 +10,14 @@ public class ApiUdpAnnouncer : IDisposable
     private Task? _broadcastTask;
 
     public ApiUdpAnnouncer(
-        IOptions<DiscoveryOptions> options,
+        INetDiscoverySettingsRepository settings,
         DiscoveryServiceIdentity localIdentity
     )
     {
+        DiscoveryOptions opt = settings.GetCurrent();
         _udpBroadcaster = new UdpDiscovery.Net.UdpDiscovery(
             serviceName: localIdentity.ExpectedServiceName,
-            discoveryPort: (ushort)options.Value.UdpPort
+            discoveryPort: (ushort)opt.UdpPort
         );
     }
 
