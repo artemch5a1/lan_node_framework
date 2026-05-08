@@ -20,14 +20,6 @@ public sealed class NetDiscoveryHostedService : IHostedService
         _log = log;
     }
 
-    public async Task<DiscoveryOptions> ChangeConfiguration(
-        DiscoveryOptions newDiscoveryOptions,
-        CancellationToken cancellationToken = default
-    )
-    {
-        return await _settings.UpdateConfiguration(newDiscoveryOptions, cancellationToken);
-    }
-
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await _settings.EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
