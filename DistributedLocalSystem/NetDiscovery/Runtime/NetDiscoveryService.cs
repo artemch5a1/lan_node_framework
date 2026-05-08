@@ -58,6 +58,14 @@ public sealed class NetDiscoveryService : IDisposable
         }
     }
 
+    public async Task<DiscoveryOptions> ChangeConfiguration(
+        DiscoveryOptions newDiscoveryOptions,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return await _settings.UpdateConfiguration(newDiscoveryOptions, cancellationToken);
+    }
+
     /// <summary>Снимок для <c>GET /api/net/status</c>.</summary>
     public NetStatusDto GetStatus()
     {
