@@ -19,6 +19,18 @@ type NetStatus = {
   appId: string;
 };
 
+type DiscoveryOptions = {
+  role: NetConfiguredRole;
+  appId: string;
+  udpPort: number;
+  lanPort: number;
+  beaconIntervalMs: number;
+  discoveryTimeoutMs: number;
+  protocolVersion: number;
+};
+
+type AdminPanelTab = "current" | "change";
+
 function roleLabel(role: NetConfiguredRole): string {
   switch (role) {
     case "host":
@@ -48,10 +60,13 @@ type AdminPanelProps = {
 
 export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
   const [open, setOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<AdminPanelTab>("current");
   const [configuredRole, setConfiguredRole] = useState<NetConfiguredRole | null>(null);
   const [net, setNet] = useState<NetStatus | null>(null);
+  const [configuration, setConfiguration] = useState<DiscoveryOptions | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [savingConfiguration, setSavingConfiguration] = useState(false);
 
   const toggle = useCallback(() => {
     setOpen((v) => !v);
@@ -82,10 +97,18 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
     setNet((await r.json()) as NetStatus);
   }, [baseUrl]);
 
+  const fetchConfiguration = useCallback(async () => {
+    if (!baseUrl) return;
+    const r = await fetch(`${baseUrl}/api/net/configuration`);
+    if (!r.ok) throw new Error(`configuration ${r.status}`);
+    setConfiguration((await r.json()) as DiscoveryOptions);
+  }, [baseUrl]);
+
   useEffect(() => {
     if (!baseUrl) return;
     void fetchRole().catch((e) => setError(String(e)));
-  }, [baseUrl, fetchRole]);
+    void fetchConfiguration().catch((e) => setError(String(e)));
+  }, [baseUrl, fetchRole, fetchConfiguration]);
 
   useEffect(() => {
     if (!baseUrl) return;
@@ -107,6 +130,38 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
     }
   }
 
+  async function saveConfiguration() {
+    if (!baseUrl || !configuration) return;
+    setSavingConfiguration(true);
+    setError(null);
+    try {
+      const response = await fetch(`${baseUrl}/api/net/configuration`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(configuration),
+      });
+
+      if (!response.ok) throw new Error(`configuration update ${response.status}`);
+
+      const updatedConfiguration = (await response.json()) as DiscoveryOptions;
+      setConfiguration(updatedConfiguration);
+      await Promise.all([fetchRole(), fetchStatus()]);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setSavingConfiguration(false);
+    }
+  }
+
+  function updateConfigurationField<K extends keyof DiscoveryOptions>(
+    key: K,
+    value: DiscoveryOptions[K]
+  ) {
+    setConfiguration((prev) => (prev ? { ...prev, [key]: value } : prev));
+  }
+
   return (
     <div
       className={`admin-panel ${open ? "admin-panel--open" : ""}`}
@@ -121,54 +176,163 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
         {!baseUrl && !backendLoadError && <p className="muted">Загрузка backend…</p>}
         {error && <p className="error">{error}</p>}
 
-        <section className="card admin-panel__card">
-          <div className="row card-header-row">
-            <h2>Режим из конфигурации</h2>
-            <button
-              type="button"
-              className="btn-refresh"
-              disabled={!baseUrl || refreshing}
-              onClick={() => void refreshPageInfo()}
-            >
-              {refreshing ? "Обновление…" : "Обновить"}
-            </button>
-          </div>
-          {configuredRole == null && baseUrl ? (
-            <p className="muted">Запрос /api/net/role…</p>
-          ) : configuredRole == null ? (
-            <p className="muted">Ожидание адреса backend…</p>
-          ) : (
-            <>
-              <p>
-                <strong>{roleLabel(configuredRole)}</strong>
-              </p>
-              <p className="hint">
-                Меняется только в <code>appsettings.json</code> → <code>Net:Role</code> (<code>none</code>,{" "}
-                <code>host</code>, <code>client</code>), затем перезапуск процесса backend.
-              </p>
-            </>
-          )}
+        <section className="admin-panel__menu admin-panel__card">
+          <button
+            type="button"
+            className={`admin-panel__menu-btn ${activeTab === "current" ? "admin-panel__menu-btn--active" : ""}`}
+            onClick={() => setActiveTab("current")}
+          >
+            Текущая конфигурация
+          </button>
+          <button
+            type="button"
+            className={`admin-panel__menu-btn ${activeTab === "change" ? "admin-panel__menu-btn--active" : ""}`}
+            onClick={() => setActiveTab("change")}
+          >
+            Смена конфигурации
+          </button>
         </section>
 
-        {net && (
-          <section className="card status admin-panel__card">
-            <h2>Статус discovery</h2>
-            <dl>
-              <dt>configuredRole (из конфига)</dt>
-              <dd>{net.configuredRole}</dd>
-              <dt>state</dt>
-              <dd>{net.state}</dd>
-              <dt>thisHostIp</dt>
-              <dd>{net.thisHostIp ?? "—"}</dd>
-              <dt>remoteHostBaseUrl</dt>
-              <dd>{net.remoteHostBaseUrl ?? "—"}</dd>
-              <dt>UDP / LAN порты</dt>
-              <dd>
-                {net.udpPort} / {net.lanPort}
-              </dd>
-              <dt>appId</dt>
-              <dd>{net.appId}</dd>
-            </dl>
+        {activeTab === "current" && (
+          <>
+            <section className="card admin-panel__card">
+              <div className="row card-header-row">
+                <h2>Режим из конфигурации</h2>
+                <button
+                  type="button"
+                  className="btn-refresh"
+                  disabled={!baseUrl || refreshing}
+                  onClick={() => void refreshPageInfo()}
+                >
+                  {refreshing ? "Обновление…" : "Обновить"}
+                </button>
+              </div>
+              {configuredRole == null && baseUrl ? (
+                <p className="muted">Запрос /api/net/role…</p>
+              ) : configuredRole == null ? (
+                <p className="muted">Ожидание адреса backend…</p>
+              ) : (
+                <>
+                  <p>
+                    <strong>{roleLabel(configuredRole)}</strong>
+                  </p>
+                  <p className="hint">Текущее значение role из конфигурации backend.</p>
+                </>
+              )}
+            </section>
+
+            {net && (
+              <section className="card status admin-panel__card">
+                <h2>Статус discovery</h2>
+                <dl>
+                  <dt>configuredRole (из конфига)</dt>
+                  <dd>{net.configuredRole}</dd>
+                  <dt>state</dt>
+                  <dd>{net.state}</dd>
+                  <dt>thisHostIp</dt>
+                  <dd>{net.thisHostIp ?? "—"}</dd>
+                  <dt>remoteHostBaseUrl</dt>
+                  <dd>{net.remoteHostBaseUrl ?? "—"}</dd>
+                  <dt>UDP / LAN порты</dt>
+                  <dd>
+                    {net.udpPort} / {net.lanPort}
+                  </dd>
+                  <dt>appId</dt>
+                  <dd>{net.appId}</dd>
+                </dl>
+              </section>
+            )}
+          </>
+        )}
+
+        {activeTab === "change" && (
+          <section className="card admin-panel__card">
+            <div className="row card-header-row">
+              <h2>Изменение конфигурации</h2>
+              <button
+                type="button"
+                className="btn-refresh"
+                disabled={!baseUrl || !configuration || savingConfiguration}
+                onClick={() => void saveConfiguration()}
+              >
+                {savingConfiguration ? "Сохранение…" : "Сохранить"}
+              </button>
+            </div>
+            {!configuration ? (
+              <p className="muted">Загрузка текущей конфигурации…</p>
+            ) : (
+              <div className="admin-panel__form">
+                <label className="admin-panel__field">
+                  <span>Role</span>
+                  <select
+                    value={configuration.role}
+                    onChange={(e) => updateConfigurationField("role", e.target.value as NetConfiguredRole)}
+                  >
+                    <option value="none">none</option>
+                    <option value="host">host</option>
+                    <option value="client">client</option>
+                  </select>
+                </label>
+
+                <label className="admin-panel__field">
+                  <span>AppId</span>
+                  <input
+                    type="text"
+                    value={configuration.appId}
+                    onChange={(e) => updateConfigurationField("appId", e.target.value)}
+                  />
+                </label>
+
+                <label className="admin-panel__field">
+                  <span>UdpPort</span>
+                  <input
+                    type="number"
+                    value={configuration.udpPort}
+                    onChange={(e) => updateConfigurationField("udpPort", Number(e.target.value))}
+                  />
+                </label>
+
+                <label className="admin-panel__field">
+                  <span>LanPort</span>
+                  <input
+                    type="number"
+                    value={configuration.lanPort}
+                    onChange={(e) => updateConfigurationField("lanPort", Number(e.target.value))}
+                  />
+                </label>
+
+                <label className="admin-panel__field">
+                  <span>BeaconIntervalMs</span>
+                  <input
+                    type="number"
+                    value={configuration.beaconIntervalMs}
+                    onChange={(e) =>
+                      updateConfigurationField("beaconIntervalMs", Number(e.target.value))
+                    }
+                  />
+                </label>
+
+                <label className="admin-panel__field">
+                  <span>DiscoveryTimeoutMs</span>
+                  <input
+                    type="number"
+                    value={configuration.discoveryTimeoutMs}
+                    onChange={(e) =>
+                      updateConfigurationField("discoveryTimeoutMs", Number(e.target.value))
+                    }
+                  />
+                </label>
+
+                <label className="admin-panel__field">
+                  <span>ProtocolVersion</span>
+                  <input
+                    type="number"
+                    value={configuration.protocolVersion}
+                    onChange={(e) => updateConfigurationField("protocolVersion", Number(e.target.value))}
+                  />
+                </label>
+              </div>
+            )}
           </section>
         )}
       </div>

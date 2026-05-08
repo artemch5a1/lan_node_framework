@@ -162,7 +162,7 @@ public class DiscoveryAndModelTests
 
     private sealed class StubNetDiscoverySettingsRepository : INetDiscoverySettingsRepository
     {
-        private readonly DiscoveryOptions _o;
+        private DiscoveryOptions _o;
 
         public StubNetDiscoverySettingsRepository(DiscoveryOptions o) =>
             _o = NetDiscoverySettingsDefaults.Clone(o);
@@ -175,6 +175,15 @@ public class DiscoveryAndModelTests
         public Task<DiscoveryOptions> ReloadFromDatabaseAsync(
             CancellationToken cancellationToken = default
         ) => Task.FromResult(GetCurrent());
+
+        public Task<DiscoveryOptions> UpdateConfiguration(
+            DiscoveryOptions newDiscoveryOptions,
+            CancellationToken cancellationToken = default
+        )
+        {
+            _o = NetDiscoverySettingsDefaults.Clone(newDiscoveryOptions);
+            return Task.FromResult(GetCurrent());
+        }
     }
 
     private static void SetPrivateField<T>(object target, string fieldName, T value)

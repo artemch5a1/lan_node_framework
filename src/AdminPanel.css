@@ -43,6 +43,36 @@
   margin-right: auto;
 }
 
+.admin-panel__menu {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.admin-panel__menu-btn {
+  flex: 1;
+}
+
+.admin-panel__menu-btn--active {
+  outline: 2px solid currentColor;
+}
+
+.admin-panel__form {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.admin-panel__field {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.admin-panel__field input,
+.admin-panel__field select {
+  min-height: 2rem;
+  padding: 0.25rem 0.5rem;
+}
+
 .admin-panel__card:last-child {
   margin-bottom: 0;
 }

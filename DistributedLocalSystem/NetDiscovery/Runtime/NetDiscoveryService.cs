@@ -66,6 +66,8 @@ public sealed class NetDiscoveryService : IDisposable
         return await _settings.UpdateConfiguration(newDiscoveryOptions, cancellationToken);
     }
 
+    public DiscoveryOptions GetCurrentConfiguration() => _settings.GetCurrent();
+
     /// <summary>Снимок для <c>GET /api/net/status</c>.</summary>
     public NetStatusDto GetStatus()
     {
