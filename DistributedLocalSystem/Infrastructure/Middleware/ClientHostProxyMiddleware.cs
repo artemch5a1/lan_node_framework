@@ -1,11 +1,6 @@
-using System.Collections.Generic;
-using System.IO;
-using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Text.Json;
+using DistributedLocalSystem.Core.Infrastructure.Attributes;
 using DistributedLocalSystem.Core.NetDiscovery;
-using Microsoft.AspNetCore.Http.Json;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 
 namespace DistributedLocalSystem.Core.Middleware;
@@ -13,7 +8,11 @@ namespace DistributedLocalSystem.Core.Middleware;
 /// <summary>
 /// В режиме клиента с найденным хостом пересылает HTTP на LAN-хост, кроме служебных путей (health, net API).
 /// </summary>
-public sealed class ClientHostProxyMiddleware
+public sealed class ClientHostProxyMiddleware(
+    RequestDelegate next,
+    IHttpClientFactory httpClientFactory,
+    ILogger<ClientHostProxyMiddleware> logger
+)
 {
     private static readonly HashSet<string> HopByHopRequestHeaders = new(
         StringComparer.OrdinalIgnoreCase
@@ -40,220 +39,231 @@ public sealed class ClientHostProxyMiddleware
         "Connection",
     };
 
-    private readonly RequestDelegate _next;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILogger<ClientHostProxyMiddleware> _log;
-
-    public ClientHostProxyMiddleware(
-        RequestDelegate next,
-        IHttpClientFactory httpClientFactory,
-        ILogger<ClientHostProxyMiddleware> log
-    )
+    private static readonly HashSet<string> MethodsWithBody = new(StringComparer.OrdinalIgnoreCase)
     {
-        _next = next;
-        _httpClientFactory = httpClientFactory;
-        _log = log;
-    }
+        HttpMethods.Post,
+        HttpMethods.Put,
+        HttpMethods.Patch,
+        HttpMethods.Delete,
+    };
+
+    private readonly RequestDelegate _next = next;
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+    private readonly ILogger<ClientHostProxyMiddleware> _logger = logger;
 
     public async Task InvokeAsync(HttpContext context, NetDiscoveryService net)
     {
-        if (context.Request.Path.StartsWithSegments("/api/net/status"))
-        {
-            NetStatusDto status = net.GetStatus();
-            context.Response.ContentType = "application/json";
-            JsonSerializerOptions jsonOptions = context
-                .RequestServices.GetRequiredService<IOptions<JsonOptions>>()
-                .Value.SerializerOptions;
-
-            await JsonSerializer
-                .SerializeAsync(context.Response.Body, status, jsonOptions, context.RequestAborted)
-                .ConfigureAwait(false);
-            return;
-        }
-
-        if (context.Request.Path.StartsWithSegments("/api/net/role"))
-        {
-            NetStatusDto status = net.GetStatus();
-            context.Response.ContentType = "application/json";
-            JsonSerializerOptions jsonOptions = context
-                .RequestServices.GetRequiredService<IOptions<JsonOptions>>()
-                .Value.SerializerOptions;
-
-            await JsonSerializer
-                .SerializeAsync(
-                    context.Response.Body,
-                    new { role = status.ConfiguredRole },
-                    jsonOptions,
-                    context.RequestAborted
-                )
-                .ConfigureAwait(false);
-            return;
-        }
-
-        if (ShouldBypass(context.Request.Path))
+        if (ShouldSkipProxy(context))
         {
             await _next(context).ConfigureAwait(false);
             return;
         }
 
-        if (!net.TryGetHostProxyBaseUrl(out string? remoteBase) || string.IsNullOrEmpty(remoteBase))
+        if (!TryGetRemoteBaseUrl(net, out string? remoteBase) || remoteBase is null)
         {
             await _next(context).ConfigureAwait(false);
             return;
         }
 
+        await ProxyRequestAsync(context, remoteBase, net).ConfigureAwait(false);
+    }
+
+    #region Private Methods
+
+    private static bool ShouldSkipProxy(HttpContext context)
+    {
+        Endpoint? endpoint = context.GetEndpoint();
+        return endpoint?.Metadata.GetMetadata<NotRedirect>() != null;
+    }
+
+    private static bool TryGetRemoteBaseUrl(NetDiscoveryService net, out string? remoteBase)
+    {
+        return net.TryGetHostProxyBaseUrl(out remoteBase) && !string.IsNullOrEmpty(remoteBase);
+    }
+
+    private async Task ProxyRequestAsync(
+        HttpContext context,
+        string remoteBase,
+        NetDiscoveryService net
+    )
+    {
         try
         {
-            await ForwardAsync(context, remoteBase, net).ConfigureAwait(false);
+            await ForwardToRemoteHostAsync(context, remoteBase).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        catch (Exception ex) when (IsTransportError(ex))
         {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _log.LogWarning(ex, "Proxy to host {Base} failed", remoteBase);
-            context.Response.StatusCode = StatusCodes.Status502BadGateway;
-            await context
-                .Response.WriteAsync("Bad gateway: host unreachable.", context.RequestAborted)
-                .ConfigureAwait(false);
+            await HandleTransportErrorAsync(context, remoteBase, net, ex).ConfigureAwait(false);
         }
     }
 
-    /// <summary>Пути, которые всегда обрабатывает локальный процесс (клиентский UI / управление).</summary>
-    internal static bool ShouldBypass(PathString path)
+    private async Task ForwardToRemoteHostAsync(HttpContext context, string remoteBase)
     {
-        if (path.StartsWithSegments("/health"))
-            return true;
-        return false;
+        Uri targetUri = BuildTargetUri(context.Request, remoteBase);
+        using HttpRequestMessage requestMessage = CreateProxyRequest(context.Request, targetUri);
+
+        using HttpClient httpClient = _httpClientFactory.CreateClient("hostProxy");
+        using HttpResponseMessage response = await httpClient
+            .SendAsync(
+                requestMessage,
+                HttpCompletionOption.ResponseHeadersRead,
+                context.RequestAborted
+            )
+            .ConfigureAwait(false);
+
+        await CopyResponseToContextAsync(context, response).ConfigureAwait(false);
     }
 
-    private static Uri BuildTargetUri(HttpRequest request, string remoteBase)
+    private static HttpRequestMessage CreateProxyRequest(HttpRequest request, Uri targetUri)
     {
-        string relative = (request.Path + request.QueryString).ToString();
-        if (string.IsNullOrEmpty(relative))
-            relative = "/";
-        string baseWithSlash = remoteBase.EndsWith('/') ? remoteBase : remoteBase + "/";
-        return new Uri(new Uri(baseWithSlash, UriKind.Absolute), relative);
-    }
-
-    private async Task ForwardAsync(HttpContext context, string remoteBase, NetDiscoveryService net)
-    {
-        Uri target = BuildTargetUri(context.Request, remoteBase);
-        using HttpRequestMessage requestMessage = new(
-            new HttpMethod(context.Request.Method),
-            target
+        HttpRequestMessage requestMessage = new HttpRequestMessage(
+            new HttpMethod(request.Method),
+            targetUri
         );
 
-        bool hasBody = RequestMayHaveBody(context.Request);
-        foreach (KeyValuePair<string, StringValues> header in context.Request.Headers)
+        CopyRequestHeaders(request, requestMessage);
+
+        if (RequestHasBody(request))
         {
-            if (HopByHopRequestHeaders.Contains(header.Key))
+            requestMessage.Content = CreateStreamContent(request);
+        }
+
+        return requestMessage;
+    }
+
+    private static void CopyRequestHeaders(HttpRequest request, HttpRequestMessage requestMessage)
+    {
+        foreach (KeyValuePair<string, StringValues> header in request.Headers)
+        {
+            string key = header.Key;
+            StringValues value = header.Value;
+
+            if (ShouldSkipRequestHeader(key))
                 continue;
-            if (!header.Key.StartsWith(':'))
-                requestMessage.Headers.TryAddWithoutValidation(header.Key, header.Value.ToArray());
-        }
 
-        if (hasBody)
-        {
-            StreamContent streamContent = new(context.Request.Body);
-            string? contentType = context.Request.ContentType;
-            if (!string.IsNullOrEmpty(contentType))
-                streamContent.Headers.ContentType = MediaTypeHeaderValue.Parse(contentType);
-            requestMessage.Content = streamContent;
-        }
-
-        HttpClient client = _httpClientFactory.CreateClient("hostProxy");
-
-        HttpResponseMessage upstream;
-        try
-        {
-            upstream = await client
-                .SendAsync(
-                    requestMessage,
-                    HttpCompletionOption.ResponseHeadersRead,
-                    context.RequestAborted
-                )
-                .ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (OperationCanceledException ex)
-        {
-            await OnProxyTransportFailureAsync(context, remoteBase, net, ex).ConfigureAwait(false);
-            throw;
-        }
-        catch (HttpRequestException ex)
-        {
-            await OnProxyTransportFailureAsync(context, remoteBase, net, ex).ConfigureAwait(false);
-            throw;
-        }
-        catch (IOException ex)
-        {
-            await OnProxyTransportFailureAsync(context, remoteBase, net, ex).ConfigureAwait(false);
-            throw;
-        }
-
-        using (upstream)
-        {
-            context.Response.StatusCode = (int)upstream.StatusCode;
-
-            CopySafeResponseHeaders(upstream.Headers, context.Response.Headers);
-
-            if (upstream.Content is { } body)
-            {
-                CopySafeResponseHeaders(body.Headers, context.Response.Headers);
-                await body.CopyToAsync(context.Response.Body, context.RequestAborted)
-                    .ConfigureAwait(false);
-            }
+            requestMessage.Headers.TryAddWithoutValidation(key, value.ToArray());
         }
     }
 
-    /// <summary>
-    /// После таймаута 5 с или обрыва соединения — проверка <c>/health</c> у удалённого хоста; при отсутствии ответа — перезапуск UDP discovery.
-    /// </summary>
-    private async Task OnProxyTransportFailureAsync(
+    private static bool ShouldSkipRequestHeader(string headerKey)
+    {
+        return HopByHopRequestHeaders.Contains(headerKey) || headerKey.StartsWith(':');
+    }
+
+    private static StreamContent CreateStreamContent(HttpRequest request)
+    {
+        StreamContent streamContent = new StreamContent(request.Body);
+
+        if (!string.IsNullOrEmpty(request.ContentType))
+        {
+            streamContent.Headers.ContentType = MediaTypeHeaderValue.Parse(request.ContentType);
+        }
+
+        return streamContent;
+    }
+
+    private static bool RequestHasBody(HttpRequest request)
+    {
+        if (HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method))
+            return false;
+
+        return request.ContentLength > 0 || MethodsWithBody.Contains(request.Method);
+    }
+
+    private static async Task CopyResponseToContextAsync(
+        HttpContext context,
+        HttpResponseMessage response
+    )
+    {
+        context.Response.StatusCode = (int)response.StatusCode;
+
+        CopyResponseHeaders(response.Headers, context.Response.Headers);
+
+        if (response.Content != null)
+        {
+            CopyResponseHeaders(response.Content.Headers, context.Response.Headers);
+            await response
+                .Content.CopyToAsync(context.Response.Body, context.RequestAborted)
+                .ConfigureAwait(false);
+        }
+    }
+
+    private static void CopyResponseHeaders(HttpHeaders from, IHeaderDictionary to)
+    {
+        foreach (KeyValuePair<string, IEnumerable<string>> header in from)
+        {
+            string key = header.Key;
+            IEnumerable<string> values = header.Value;
+
+            if (HopByHopResponseHeaders.Contains(key))
+                continue;
+
+            try
+            {
+                to.Append(key, values.ToArray());
+            }
+            catch { }
+        }
+    }
+
+    private static bool IsTransportError(Exception ex)
+    {
+        return ex is OperationCanceledException or HttpRequestException or IOException;
+    }
+
+    private async Task HandleTransportErrorAsync(
         HttpContext context,
         string remoteBase,
         NetDiscoveryService net,
-        Exception inner
+        Exception exception
     )
     {
         if (context.RequestAborted.IsCancellationRequested)
             return;
 
-        bool healthOk = await TryRemoteHealthAsync(remoteBase, context.RequestAborted)
+        bool isHealthCheckSuccessful = await CheckRemoteHealthAsync(
+                remoteBase,
+                context.RequestAborted
+            )
             .ConfigureAwait(false);
-        if (!healthOk)
+
+        if (!isHealthCheckSuccessful)
         {
-            _log.LogWarning(
-                inner,
-                "Net: proxy failed and remote /health unreachable; restarting UDP"
+            _logger.LogWarning(
+                exception,
+                "Proxy failed and remote /health unreachable; restarting UDP discovery. Remote base: {RemoteBase}",
+                remoteBase
             );
             net.RestartClientDiscoveryAfterRemoteHostFailure();
         }
         else
         {
-            _log.LogWarning(inner, "Net: proxy failed but remote /health OK");
+            _logger.LogWarning(
+                exception,
+                "Proxy failed but remote /health is OK. Remote base: {RemoteBase}",
+                remoteBase
+            );
         }
+
+        await SendGatewayErrorResponseAsync(context).ConfigureAwait(false);
     }
 
-    private async Task<bool> TryRemoteHealthAsync(
+    private async Task<bool> CheckRemoteHealthAsync(
         string remoteBase,
         CancellationToken cancellationToken
     )
     {
-        HttpClient client = _httpClientFactory.CreateClient("hostProxy");
+        HttpClient httpClient = _httpClientFactory.CreateClient("hostProxy");
         Uri healthUri = BuildHealthUri(remoteBase);
+
         try
         {
-            using HttpRequestMessage req = new(HttpMethod.Get, healthUri);
-            using HttpResponseMessage r = await client
-                .SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, healthUri);
+            using HttpResponseMessage response = await httpClient
+                .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
                 .ConfigureAwait(false);
-            return r.IsSuccessStatusCode;
+
+            return response.IsSuccessStatusCode;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -265,35 +275,29 @@ public sealed class ClientHostProxyMiddleware
         }
     }
 
+    private static async Task SendGatewayErrorResponseAsync(HttpContext context)
+    {
+        context.Response.StatusCode = StatusCodes.Status502BadGateway;
+        await context
+            .Response.WriteAsync("Bad gateway: host unreachable.", context.RequestAborted)
+            .ConfigureAwait(false);
+    }
+
+    private static Uri BuildTargetUri(HttpRequest request, string remoteBase)
+    {
+        string relativePath = (request.Path + request.QueryString).ToString();
+        if (string.IsNullOrEmpty(relativePath))
+            relativePath = "/";
+
+        string baseUri = remoteBase.EndsWith('/') ? remoteBase : remoteBase + "/";
+        return new Uri(new Uri(baseUri, UriKind.Absolute), relativePath);
+    }
+
     private static Uri BuildHealthUri(string remoteBase)
     {
-        string trimmed = remoteBase.TrimEnd('/');
-        return new Uri($"{trimmed}/health");
+        string trimmedBase = remoteBase.TrimEnd('/');
+        return new Uri($"{trimmedBase}/health");
     }
 
-    private static void CopySafeResponseHeaders(HttpHeaders from, IHeaderDictionary to)
-    {
-        foreach (KeyValuePair<string, IEnumerable<string>> header in from)
-        {
-            if (HopByHopResponseHeaders.Contains(header.Key))
-                continue;
-            try
-            {
-                to.Append(header.Key, header.Value.ToArray());
-            }
-            catch { }
-        }
-    }
-
-    private static bool RequestMayHaveBody(HttpRequest request)
-    {
-        if (HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method))
-            return false;
-        if (request.ContentLength is > 0)
-            return true;
-        return HttpMethods.IsPost(request.Method)
-            || HttpMethods.IsPut(request.Method)
-            || HttpMethods.IsPatch(request.Method)
-            || string.Equals(request.Method, "DELETE", StringComparison.OrdinalIgnoreCase);
-    }
+    #endregion
 }
