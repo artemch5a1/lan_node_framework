@@ -1,6 +1,6 @@
 using System.Text.Json;
 using DistributedLocalSystem.Core.Abstractions;
-using DistributedLocalSystem.Core.Infrastructure.Attributes;
+using DistributedLocalSystem.Infrastructure.Attributes;
 using DistributedLocalSystem.Core.NetDiscovery;
 using DistributedLocalSystem.Core.Persistence;
 using Microsoft.AspNetCore.Mvc;

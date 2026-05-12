@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
-using DistributedLocalSystem.Core.Udp;
+using DistributedLocalSystem.Infrastructure.Udp;
 using UdpDiscovery.Net;
 
 namespace DistributedLocalSystem.Core.NetDiscovery;
