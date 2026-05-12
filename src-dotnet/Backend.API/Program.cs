@@ -3,6 +3,8 @@ using Backend.Application;
 using Backend.Infrastructure;
 using DistributedLocalSystem.Core;
 using DistributedLocalSystem.Core.Infrastructure.Attributes;
+using DistributedLocalSystem.Core.Infrastructure.Middleware;
+using Microsoft.OpenApi.Models;
 
 static string ResolveLocalHttpUrl(string[] args)
 {
@@ -29,9 +31,46 @@ static string ResolveLocalHttpUrl(string[] args)
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDistributedLocalSystemCore(builder.Configuration);
+
+builder.Services.Configure<ClientHostProxyOptions>(
+    builder.Configuration.GetSection("ClientHostProxy")
+);
+
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure();
 builder.Services.AddControllers();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition(
+        "Bearer",
+        new OpenApiSecurityScheme
+        {
+            Name = "Authorization",
+            Type = SecuritySchemeType.Http,
+            Scheme = "Bearer",
+            BearerFormat = "JWT",
+            In = ParameterLocation.Header,
+            Description = "'Bearer {}' .",
+        }
+    );
+
+    options.AddSecurityRequirement(
+        new OpenApiSecurityRequirement
+        {
+            {
+                new OpenApiSecurityScheme
+                {
+                    Reference = new OpenApiReference
+                    {
+                        Type = ReferenceType.SecurityScheme,
+                        Id = "Bearer",
+                    },
+                },
+                Array.Empty<string>()
+            },
+        }
+    );
+});
 
 string localHttpUrl = ResolveLocalHttpUrl(args);
 int lanPort = builder.Configuration.GetValue("Net:LanPort", 17891);
@@ -56,6 +95,16 @@ app.MapGet(
         return Results.Text($"Hello, {safeName}! You've been greeted from C#!");
     }
 );
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Backend.API v1");
+        c.RoutePrefix = "swagger";
+    });
+}
 
 app.MapGet("/health", () => Results.Text("OK")).WithMetadata(new NotRedirect());
 

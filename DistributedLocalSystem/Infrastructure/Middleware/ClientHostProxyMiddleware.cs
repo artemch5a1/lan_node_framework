@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using DistributedLocalSystem.Core.Infrastructure.Attributes;
+using DistributedLocalSystem.Core.Infrastructure.Middleware;
 using DistributedLocalSystem.Core.NetDiscovery;
 using Microsoft.Extensions.Primitives;
 
@@ -11,7 +12,8 @@ namespace DistributedLocalSystem.Core.Middleware;
 public sealed class ClientHostProxyMiddleware(
     RequestDelegate next,
     IHttpClientFactory httpClientFactory,
-    ILogger<ClientHostProxyMiddleware> logger
+    ILogger<ClientHostProxyMiddleware> logger,
+    IOptions<ClientHostProxyOptions> options
 )
 {
     private static readonly HashSet<string> HopByHopRequestHeaders = new(
@@ -51,6 +53,8 @@ public sealed class ClientHostProxyMiddleware(
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
     private readonly ILogger<ClientHostProxyMiddleware> _logger = logger;
 
+    private readonly ClientHostProxyOptions _options = options.Value;
+
     public async Task InvokeAsync(HttpContext context, NetDiscoveryService net)
     {
         if (ShouldSkipProxy(context))
@@ -70,10 +74,49 @@ public sealed class ClientHostProxyMiddleware(
 
     #region Private Methods
 
-    private static bool ShouldSkipProxy(HttpContext context)
+    private bool ShouldSkipProxy(HttpContext context)
     {
         Endpoint? endpoint = context.GetEndpoint();
-        return endpoint?.Metadata.GetMetadata<NotRedirect>() != null;
+        if (endpoint?.Metadata.GetMetadata<NotRedirect>() != null)
+            return true;
+
+        string path = context.Request.Path.Value ?? "/";
+        if (IsIgnoredPath(path))
+            return true;
+
+        return false;
+    }
+
+    private bool IsIgnoredPath(string path)
+    {
+        if (_options.IgnoredPaths.Contains(path))
+            return true;
+
+        foreach (string ignoredPath in _options.IgnoredPaths)
+        {
+            if (path.StartsWith(ignoredPath, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        if (_options.IgnoredPathPatterns.Any())
+        {
+            foreach (string pattern in _options.IgnoredPathPatterns)
+            {
+                if (
+                    System.Text.RegularExpressions.Regex.IsMatch(
+                        path,
+                        pattern,
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                    )
+                )
+                    return true;
+            }
+        }
+
+        if (path == "/" || path == string.Empty)
+            return !_options.ProxyRootPath;
+
+        return false;
     }
 
     private static bool TryGetRemoteBaseUrl(NetDiscoveryService net, out string? remoteBase)
