@@ -1,134 +1,272 @@
+using System.Net.Mime;
 using System.Text.Json;
-using DistributedLocalSystem.Core.Abstractions;
+using DistributedLocalSystem.Application.Net.UseCases;
+using DistributedLocalSystem.Core.Domain.Net;
+using DistributedLocalSystem.Core.Flow;
 using DistributedLocalSystem.Core.NetDiscovery.Model;
 using DistributedLocalSystem.Infrastructure.Attributes;
-using DistributedLocalSystem.Infrastructure.NetDiscovery.Runtime;
-using DistributedLocalSystem.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
+namespace Backend.API.Controllers;
+
+/// <summary>
+/// API настройки LAN discovery: каждый маршрут вызывает отдельный use case и переводит <see cref="Outcome{T}"/> в HTTP.
+/// На границе домен ↔ транспорт (JSON-контракты как раньше).
+/// </summary>
 [ApiController]
 [Route("api/net")]
 [NotRedirect]
-public class NetController : ControllerBase
+public sealed class NetController : ControllerBase
 {
-    private readonly NetDiscoveryService _netService;
-    private readonly INetDiscoveryConfigurationReloadCoordinator _reloadCoordinator;
-    private readonly ILanPeerScanService _lanPeerScan;
-    private readonly IOptions<JsonOptions> _jsonOptions;
+    private readonly IGetNetStatusUseCase _getNetStatus;
+
+    private readonly IGetNetRoleUseCase _getNetRole;
+
+    private readonly IGetLanPeersUseCase _getLanPeers;
+
+    private readonly IGetNetConfigurationUseCase _getNetConfiguration;
+
+    private readonly IChangeNetConfigurationUseCase _changeNetConfiguration;
+
+    private readonly IDisconnectFromRemoteHostUseCase _disconnectFromRemoteHost;
+
+    private readonly IOptions<Microsoft.AspNetCore.Mvc.JsonOptions> _jsonOptions;
 
     public NetController(
-        NetDiscoveryService netService,
-        INetDiscoveryConfigurationReloadCoordinator reloadCoordinator,
-        ILanPeerScanService lanPeerScan,
-        IOptions<JsonOptions> jsonOptions
+        IGetNetStatusUseCase getNetStatus,
+        IGetNetRoleUseCase getNetRole,
+        IGetLanPeersUseCase getLanPeers,
+        IGetNetConfigurationUseCase getNetConfiguration,
+        IChangeNetConfigurationUseCase changeNetConfiguration,
+        IDisconnectFromRemoteHostUseCase disconnectFromRemoteHost,
+        IOptions<Microsoft.AspNetCore.Mvc.JsonOptions> jsonOptions
     )
     {
-        _netService = netService;
-        _reloadCoordinator = reloadCoordinator;
-        _lanPeerScan = lanPeerScan;
+        _getNetStatus = getNetStatus;
+
+        _getNetRole = getNetRole;
+
+        _getLanPeers = getLanPeers;
+
+        _getNetConfiguration = getNetConfiguration;
+
+        _changeNetConfiguration = changeNetConfiguration;
+
+        _disconnectFromRemoteHost = disconnectFromRemoteHost;
+
         _jsonOptions = jsonOptions;
     }
 
     [HttpGet("status")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [Produces(MediaTypeNames.Application.Json)]
     public async Task GetStatus(CancellationToken cancellationToken)
     {
-        NetStatusDto status = _netService.GetStatus();
-        Response.ContentType = "application/json";
+        Outcome<NetRuntimeSnapshot> outcome = _getNetStatus.Execute();
 
-        await JsonSerializer.SerializeAsync(
-            Response.Body,
-            status,
-            _jsonOptions.Value.JsonSerializerOptions,
-            cancellationToken
-        );
+        if (outcome.IsFailure)
+        {
+            await WriteFailureAsync(outcome.Error, cancellationToken).ConfigureAwait(false);
+
+            return;
+        }
+
+        await WriteOutcomeAsync(
+                Outcome<NetStatusDto>.Ok(outcome.Value.ToTransport()),
+                cancellationToken
+            )
+            .ConfigureAwait(false);
     }
 
     [HttpGet("role")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [Produces(MediaTypeNames.Application.Json)]
     public async Task GetRole(CancellationToken cancellationToken)
     {
-        NetStatusDto status = _netService.GetStatus();
-        Response.ContentType = "application/json";
+        Outcome<string> outcome = _getNetRole.Execute();
 
-        await JsonSerializer.SerializeAsync(
-            Response.Body,
-            new { role = status.ConfiguredRole },
-            _jsonOptions.Value.JsonSerializerOptions,
-            cancellationToken
-        );
+        if (outcome.IsFailure)
+        {
+            await WriteFailureAsync(outcome.Error, cancellationToken).ConfigureAwait(false);
+
+            return;
+        }
+
+        Response.StatusCode = StatusCodes.Status200OK;
+
+        Response.ContentType = MediaTypeNames.Application.Json;
+
+        await JsonSerializer
+            .SerializeAsync(
+                Response.Body,
+                new { role = outcome.Value },
+                _jsonOptions.Value.JsonSerializerOptions,
+                cancellationToken
+            )
+            .ConfigureAwait(false);
     }
 
     [HttpGet("lan-peers")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [Produces(MediaTypeNames.Application.Json)]
     public async Task GetLanPeers(CancellationToken cancellationToken)
     {
-        IReadOnlyList<LanPeerSnapshot> peers = await _lanPeerScan
-            .ScanAsync(cancellationToken)
+        Outcome<IReadOnlyList<LanNodeDescriptor>> outcome = await _getLanPeers
+            .ExecuteAsync(cancellationToken)
             .ConfigureAwait(false);
-        Response.ContentType = "application/json";
 
-        await JsonSerializer.SerializeAsync(
-            Response.Body,
-            peers,
-            _jsonOptions.Value.JsonSerializerOptions,
-            cancellationToken
-        );
+        if (outcome.IsFailure)
+        {
+            await WriteFailureAsync(outcome.Error, cancellationToken).ConfigureAwait(false);
+
+            return;
+        }
+
+        IReadOnlyList<LanPeerSnapshot> transport = outcome
+            .Value.Select(d => d.ToTransport())
+            .ToList();
+
+        await WriteOutcomeAsync(
+                Outcome<IReadOnlyList<LanPeerSnapshot>>.Ok(transport),
+                cancellationToken
+            )
+            .ConfigureAwait(false);
     }
 
     [HttpGet("configuration")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [Produces(MediaTypeNames.Application.Json)]
     public async Task GetConfiguration(CancellationToken cancellationToken)
     {
-        DiscoveryOptions configuration = _netService.GetCurrentConfiguration();
-        Response.ContentType = "application/json";
+        Outcome<NetConfigurationState> outcome = _getNetConfiguration.Execute();
 
-        await JsonSerializer.SerializeAsync(
-            Response.Body,
-            configuration,
-            _jsonOptions.Value.JsonSerializerOptions,
-            cancellationToken
-        );
+        if (outcome.IsFailure)
+        {
+            await WriteFailureAsync(outcome.Error, cancellationToken).ConfigureAwait(false);
+
+            return;
+        }
+
+        await WriteOutcomeAsync(
+                Outcome<DiscoveryOptions>.Ok(outcome.Value.ToTransport()),
+                cancellationToken
+            )
+            .ConfigureAwait(false);
     }
 
     [HttpPut("configuration")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [Produces(MediaTypeNames.Application.Json)]
     public async Task ChangeConfiguration(
         [FromBody] DiscoveryOptions newDiscoveryOptions,
         CancellationToken cancellationToken
     )
     {
-        DiscoveryOptions updated = await _netService.ChangeConfiguration(
-            newDiscoveryOptions,
-            cancellationToken
-        );
-        await _reloadCoordinator.ReloadAsync(cancellationToken);
-        Response.ContentType = "application/json";
+        NetConfigurationState next = NetConfigurationState.FromTransport(newDiscoveryOptions);
 
-        await JsonSerializer.SerializeAsync(
-            Response.Body,
-            updated,
-            _jsonOptions.Value.JsonSerializerOptions,
-            cancellationToken
-        );
+        Outcome<NetConfigurationState> outcome = await _changeNetConfiguration
+            .ExecuteAsync(next, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (outcome.IsFailure)
+        {
+            await WriteFailureAsync(outcome.Error, cancellationToken).ConfigureAwait(false);
+
+            return;
+        }
+
+        await WriteOutcomeAsync(
+                Outcome<DiscoveryOptions>.Ok(outcome.Value.ToTransport()),
+                cancellationToken
+            )
+            .ConfigureAwait(false);
     }
 
-    /// <summary>Отключение от удалённого хоста: снова режим host (beacon), <c>RemoteHostIp</c> сбрасывается.</summary>
     [HttpPost("disconnect")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [Produces(MediaTypeNames.Application.Json)]
     public async Task DisconnectFromRemoteHost(CancellationToken cancellationToken)
     {
-        DiscoveryOptions current = _netService.GetCurrentConfiguration();
-        DiscoveryOptions next = NetDiscoverySettingsDefaults.Clone(current);
-        next.RemoteHostIp = null;
-        next.Role = "host";
-
-        DiscoveryOptions updated = await _netService
-            .ChangeConfiguration(next, cancellationToken)
+        Outcome<NetConfigurationState> outcome = await _disconnectFromRemoteHost
+            .ExecuteAsync(cancellationToken)
             .ConfigureAwait(false);
-        await _reloadCoordinator.ReloadAsync(cancellationToken).ConfigureAwait(false);
-        Response.ContentType = "application/json";
 
-        await JsonSerializer.SerializeAsync(
-            Response.Body,
-            updated,
-            _jsonOptions.Value.JsonSerializerOptions,
-            cancellationToken
-        );
+        if (outcome.IsFailure)
+        {
+            await WriteFailureAsync(outcome.Error, cancellationToken).ConfigureAwait(false);
+
+            return;
+        }
+
+        await WriteOutcomeAsync(
+                Outcome<DiscoveryOptions>.Ok(outcome.Value.ToTransport()),
+                cancellationToken
+            )
+            .ConfigureAwait(false);
     }
+
+    private async Task WriteOutcomeAsync<T>(Outcome<T> outcome, CancellationToken cancellationToken)
+    {
+        if (outcome.IsFailure)
+        {
+            await WriteFailureAsync(outcome.Error, cancellationToken).ConfigureAwait(false);
+
+            return;
+        }
+
+        Response.StatusCode = StatusCodes.Status200OK;
+
+        Response.ContentType = MediaTypeNames.Application.Json;
+
+        await JsonSerializer
+            .SerializeAsync(
+                Response.Body,
+                outcome.Value,
+                _jsonOptions.Value.JsonSerializerOptions,
+                cancellationToken
+            )
+            .ConfigureAwait(false);
+    }
+
+    private async Task WriteFailureAsync(NetFlowError error, CancellationToken cancellationToken)
+    {
+        Response.StatusCode = StatusCodeFor(error);
+
+        Response.ContentType = MediaTypeNames.Application.Json;
+
+        await JsonSerializer
+            .SerializeAsync(
+                Response.Body,
+                new { error = new { code = error.Code, message = error.Message } },
+                _jsonOptions.Value.JsonSerializerOptions,
+                cancellationToken
+            )
+            .ConfigureAwait(false);
+    }
+
+    private static int StatusCodeFor(NetFlowError error) =>
+        error.Code switch
+        {
+            NetFlowErrorCodes.HostCollision => StatusCodes.Status409Conflict,
+
+            NetFlowErrorCodes.AnotherHostAlreadyPresent => StatusCodes.Status409Conflict,
+
+            NetFlowErrorCodes.OperationCancelled => StatusCodes.Status400BadRequest,
+
+            _ => StatusCodes.Status500InternalServerError,
+        };
 }

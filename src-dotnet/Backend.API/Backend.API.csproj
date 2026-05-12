@@ -11,7 +11,9 @@
     <ProjectReference Include="..\Backend.Infrastructure\Backend.Infrastructure.csproj" />
     <ProjectReference Include="..\Backend.Application\Backend.Application.csproj" />
     <ProjectReference Include="..\Backend.Domain\Backend.Domain.csproj" />
+    <ProjectReference Include="..\..\DistributedLocalSystem\DistributedLocalSystem.Application\DistributedLocalSystem.Application.csproj" />
+    <ProjectReference Include="..\..\DistributedLocalSystem\DistributedLocalSystem.Core\DistributedLocalSystem.Core.csproj" />
     <ProjectReference Include="..\..\DistributedLocalSystem\DistributedLocalSystem.Root\DistributedLocalSystem.Root.csproj" />
   </ItemGroup>
-  <!-- Композиция DistributedLocalSystem: Root → Core + Infrastructure -->
+  <!-- DistributedLocalSystem: Application (контракты API) + Root (композиция) -->
 </Project>

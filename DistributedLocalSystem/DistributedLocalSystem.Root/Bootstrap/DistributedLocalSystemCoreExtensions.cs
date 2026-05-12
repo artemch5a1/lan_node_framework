@@ -1,8 +1,10 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DistributedLocalSystem.Application;
 using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.NetDiscovery.Identity;
+using DistributedLocalSystem.Infrastructure.Application.Net;
 using DistributedLocalSystem.Infrastructure.Middleware;
 using DistributedLocalSystem.Infrastructure.NetDiscovery.Configuration;
 using DistributedLocalSystem.Infrastructure.NetDiscovery.Runtime;
@@ -47,6 +49,8 @@ public static class DistributedLocalSystemCoreExtensions
             INetDiscoveryConfigurationReloadCoordinator,
             NetDiscoveryConfigurationReloadCoordinator
         >();
+        services.AddSingleton<INetLanOrchestrator, NetLanOrchestratorAdapter>();
+        services.AddDistributedLocalSystemNetUseCases();
         services.AddHostedService<NetDiscoveryHostedService>();
 
         services
