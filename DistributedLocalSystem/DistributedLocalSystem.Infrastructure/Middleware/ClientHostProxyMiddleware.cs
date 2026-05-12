@@ -1,6 +1,6 @@
 using System.Net.Http.Headers;
-using DistributedLocalSystem.Core.NetDiscovery;
 using DistributedLocalSystem.Infrastructure.Attributes;
+using DistributedLocalSystem.Infrastructure.NetDiscovery.Runtime;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

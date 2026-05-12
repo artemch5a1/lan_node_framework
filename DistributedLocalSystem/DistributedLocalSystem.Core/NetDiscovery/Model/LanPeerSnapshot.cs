@@ -1,4 +1,4 @@
-namespace DistributedLocalSystem.Core.NetDiscovery;
+namespace DistributedLocalSystem.Core.NetDiscovery.Model;
 
 /// <summary>Узел в списке LAN: из UDP или «липкая» строка текущего подключения без beacon.</summary>
 public sealed record LanPeerSnapshot(

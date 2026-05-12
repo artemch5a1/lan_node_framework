@@ -1,10 +1,9 @@
 using System.Net;
-using DistributedLocalSystem.Core.NetDiscovery;
 using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
-using DistributedLocalSystem.Infrastructure.Persistence;
+using DistributedLocalSystem.Core.NetDiscovery.Model;
 using DistributedLocalSystem.Infrastructure.Persistence.Entities;
 
-namespace DistributedLocalSystem.Core.Persistence;
+namespace DistributedLocalSystem.Infrastructure.Persistence;
 
 /// <summary>Стартовая строка при первом создании БД (значения как в прежнем appsettings.json → Net).</summary>
 public static class NetDiscoverySettingsDefaults

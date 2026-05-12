@@ -1,7 +1,7 @@
 using System.Net;
 using Backend.Application;
 using Backend.Infrastructure;
-using DistributedLocalSystem.Core;
+using DistributedLocalSystem.Root.Bootstrap;
 using DistributedLocalSystem.Infrastructure.Attributes;
 using DistributedLocalSystem.Infrastructure.Middleware;
 using Microsoft.OpenApi.Models;

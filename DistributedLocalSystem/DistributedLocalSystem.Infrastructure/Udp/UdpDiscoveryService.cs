@@ -1,6 +1,6 @@
 using DistributedLocalSystem.Core.Abstractions;
-using DistributedLocalSystem.Core.NetDiscovery;
-using Microsoft.Extensions.Hosting;
+using DistributedLocalSystem.Core.NetDiscovery.Identity;
+using DistributedLocalSystem.Core.NetDiscovery.Model;
 using UdpDiscovery.Net;
 
 namespace DistributedLocalSystem.Infrastructure.Udp;

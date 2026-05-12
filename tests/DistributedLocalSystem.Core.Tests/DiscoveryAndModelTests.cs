@@ -1,8 +1,11 @@
 using System.Net;
 using System.Reflection;
 using DistributedLocalSystem.Core.Abstractions;
-using DistributedLocalSystem.Core.NetDiscovery;
-using DistributedLocalSystem.Core.Persistence;
+using DistributedLocalSystem.Core.NetDiscovery.Identity;
+using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
+using DistributedLocalSystem.Core.NetDiscovery.Model;
+using DistributedLocalSystem.Infrastructure.NetDiscovery.Runtime;
+using DistributedLocalSystem.Infrastructure.Persistence;
 using Microsoft.Extensions.Logging.Abstractions;
 using UdpDiscovery.Net;
 

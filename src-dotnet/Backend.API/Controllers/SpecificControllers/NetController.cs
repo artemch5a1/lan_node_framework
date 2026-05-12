@@ -1,8 +1,9 @@
 using System.Text.Json;
 using DistributedLocalSystem.Core.Abstractions;
+using DistributedLocalSystem.Core.NetDiscovery.Model;
 using DistributedLocalSystem.Infrastructure.Attributes;
-using DistributedLocalSystem.Core.NetDiscovery;
-using DistributedLocalSystem.Core.Persistence;
+using DistributedLocalSystem.Infrastructure.NetDiscovery.Runtime;
+using DistributedLocalSystem.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 

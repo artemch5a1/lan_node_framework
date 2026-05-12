@@ -1,4 +1,4 @@
-namespace DistributedLocalSystem.Core.NetDiscovery;
+namespace DistributedLocalSystem.Core.NetDiscovery.Model;
 
 /// <summary>Как фильтровать входящие UDP beacon-сообщения по имени сервиса.</summary>
 public enum LanUdpPeerFilterKind

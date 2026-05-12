@@ -2,10 +2,12 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 using DistributedLocalSystem.Core.Abstractions;
+using DistributedLocalSystem.Core.NetDiscovery.Identity;
+using DistributedLocalSystem.Core.NetDiscovery.Model;
 using DistributedLocalSystem.Infrastructure.Udp;
 using UdpDiscovery.Net;
 
-namespace DistributedLocalSystem.Core.NetDiscovery;
+namespace DistributedLocalSystem.Infrastructure.NetDiscovery.Runtime;
 
 /// <summary>UDP discovery: хост — beacon, клиент — поиск хоста или <see cref="NetDiscoveryState.ClientLocalOnly"/>.</summary>
 public sealed class NetDiscoveryService : IDisposable

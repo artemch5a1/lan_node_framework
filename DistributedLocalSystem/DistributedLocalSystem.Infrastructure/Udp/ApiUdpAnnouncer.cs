@@ -1,7 +1,6 @@
 using DistributedLocalSystem.Core.Abstractions;
-using DistributedLocalSystem.Core.NetDiscovery;
-
-namespace DistributedLocalSystem.Infrastructure.Udp;
+using DistributedLocalSystem.Core.NetDiscovery.Identity;
+using DistributedLocalSystem.Core.NetDiscovery.Model;
 
 public class ApiUdpAnnouncer : IDisposable
 {

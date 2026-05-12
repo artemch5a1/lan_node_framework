@@ -1,4 +1,6 @@
-namespace DistributedLocalSystem.Core.NetDiscovery;
+using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
+
+namespace DistributedLocalSystem.Core.NetDiscovery.Model;
 
 public sealed class DiscoveryOptions
 {
@@ -8,7 +10,7 @@ public sealed class DiscoveryOptions
     /// <summary>Режим из хранилища: host | client (none устарел; при сохранении выводится из RemoteHostIp).</summary>
     public string Role { get; set; } = "host";
 
-    /// <summary>Полное имя в UDP beacon: <c>DLSv1-product-instance</c> (см. <see cref="LanBeacon.LanBeaconName"/>).</summary>
+    /// <summary>Полное имя в UDP beacon: <c>DLSv1-product-instance</c> (см. <see cref="LanBeaconName"/>).</summary>
     public string AppId { get; set; } = "";
 
     /// <summary>Общий slug продукта для всех экземпляров линейки.</summary>

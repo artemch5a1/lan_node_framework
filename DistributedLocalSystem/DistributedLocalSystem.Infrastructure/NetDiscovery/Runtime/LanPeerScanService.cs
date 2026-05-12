@@ -1,11 +1,13 @@
 using System.Collections.Concurrent;
 using System.Net;
 using DistributedLocalSystem.Core.Abstractions;
+using DistributedLocalSystem.Core.NetDiscovery.Identity;
 using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
+using DistributedLocalSystem.Core.NetDiscovery.Model;
 using DistributedLocalSystem.Infrastructure.Udp;
 using UdpDiscovery.Net;
 
-namespace DistributedLocalSystem.Core.NetDiscovery;
+namespace DistributedLocalSystem.Infrastructure.NetDiscovery.Runtime;
 
 /// <summary>Сканирование LAN: узлы с тем же <see cref="DiscoveryOptions.ProductSlug"/> (формат DLSv1).</summary>
 public sealed class LanPeerScanService : ILanPeerScanService

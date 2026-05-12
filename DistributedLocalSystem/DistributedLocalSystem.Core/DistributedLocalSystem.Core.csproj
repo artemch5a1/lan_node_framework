@@ -5,6 +5,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <!--
-    Контракты и модели LAN discovery без транспорта (UDP/EF — в DistributedLocalSystem.Infrastructure).
+    Слой Core: Abstractions, NetDiscovery (Model / Identity / LanBeacon).
   -->
 </Project>

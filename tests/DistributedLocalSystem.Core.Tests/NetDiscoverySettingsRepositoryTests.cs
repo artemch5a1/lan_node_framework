@@ -1,5 +1,4 @@
-using DistributedLocalSystem.Core.NetDiscovery;
-using DistributedLocalSystem.Core.Persistence;
+using DistributedLocalSystem.Core.NetDiscovery.Model;
 using DistributedLocalSystem.Infrastructure.Persistence;
 using DistributedLocalSystem.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;

@@ -2,8 +2,10 @@ using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DistributedLocalSystem.Core.Abstractions;
-using DistributedLocalSystem.Core.NetDiscovery;
+using DistributedLocalSystem.Core.NetDiscovery.Identity;
 using DistributedLocalSystem.Infrastructure.Middleware;
+using DistributedLocalSystem.Infrastructure.NetDiscovery.Configuration;
+using DistributedLocalSystem.Infrastructure.NetDiscovery.Runtime;
 using DistributedLocalSystem.Infrastructure.Persistence;
 using DistributedLocalSystem.Infrastructure.Persistence.Repositories;
 using Microsoft.AspNetCore.Builder;
@@ -11,7 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DistributedLocalSystem.Core;
+namespace DistributedLocalSystem.Root.Bootstrap;
 
 public static class DistributedLocalSystemCoreExtensions
 {

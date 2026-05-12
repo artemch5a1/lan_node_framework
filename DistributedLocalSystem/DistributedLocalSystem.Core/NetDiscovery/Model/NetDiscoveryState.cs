@@ -1,4 +1,4 @@
-namespace DistributedLocalSystem.Core.NetDiscovery;
+namespace DistributedLocalSystem.Core.NetDiscovery.Model;
 
 /// <summary>Единое состояние UDP discovery.</summary>
 public enum NetDiscoveryState

@@ -1,4 +1,4 @@
-using DistributedLocalSystem.Core.NetDiscovery;
+using DistributedLocalSystem.Core.NetDiscovery.Model;
 
 namespace DistributedLocalSystem.Core.Abstractions;
 

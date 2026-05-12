@@ -1,7 +1,8 @@
 using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
+using DistributedLocalSystem.Core.NetDiscovery.Model;
 
-namespace DistributedLocalSystem.Core.NetDiscovery;
+namespace DistributedLocalSystem.Core.NetDiscovery.Identity;
 
 /// <summary>
 /// Идентичность приложения в LAN UDP discovery: то же значение, что <c>serviceName</c> в UdpDiscovery.Net

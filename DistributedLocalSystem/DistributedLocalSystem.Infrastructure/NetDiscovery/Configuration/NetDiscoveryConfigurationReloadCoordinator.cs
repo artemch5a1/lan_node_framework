@@ -1,6 +1,8 @@
 using DistributedLocalSystem.Core.Abstractions;
+using DistributedLocalSystem.Core.NetDiscovery.Model;
+using DistributedLocalSystem.Infrastructure.NetDiscovery.Runtime;
 
-namespace DistributedLocalSystem.Core.NetDiscovery;
+namespace DistributedLocalSystem.Infrastructure.NetDiscovery.Configuration;
 
 public sealed class NetDiscoveryConfigurationReloadCoordinator
     : INetDiscoveryConfigurationReloadCoordinator

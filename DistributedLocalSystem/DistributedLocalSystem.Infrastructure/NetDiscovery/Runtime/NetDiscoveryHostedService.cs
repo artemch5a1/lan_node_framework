@@ -1,6 +1,7 @@
 using DistributedLocalSystem.Core.Abstractions;
+using DistributedLocalSystem.Core.NetDiscovery.Model;
 
-namespace DistributedLocalSystem.Core.NetDiscovery;
+namespace DistributedLocalSystem.Infrastructure.NetDiscovery.Runtime;
 
 /// <summary>Старт/стоп discovery по <see cref="DiscoveryOptions.Role"/> из репозитория настроек.</summary>
 public sealed class NetDiscoveryHostedService : IHostedService

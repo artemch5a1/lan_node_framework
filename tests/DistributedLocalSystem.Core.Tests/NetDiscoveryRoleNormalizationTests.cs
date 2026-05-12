@@ -1,5 +1,5 @@
-using DistributedLocalSystem.Core.NetDiscovery;
-using DistributedLocalSystem.Core.Persistence;
+using DistributedLocalSystem.Core.NetDiscovery.Model;
+using DistributedLocalSystem.Infrastructure.Persistence;
 
 namespace DistributedLocalSystem.Core.Tests;
 
