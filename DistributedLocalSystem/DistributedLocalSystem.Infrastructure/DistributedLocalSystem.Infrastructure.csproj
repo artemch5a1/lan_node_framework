@@ -11,5 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DistributedLocalSystem.Core\DistributedLocalSystem.Core.csproj" />
+    <ProjectReference Include="..\..\src-dotnet\Backend.Application\Backend.Application.csproj" />
   </ItemGroup>
 </Project>
