@@ -5,8 +5,8 @@ public sealed class DiscoveryOptions
     /// <summary>Логическое имя группы (хранится в SQLite, таблица net_discovery_settings).</summary>
     public const string SectionName = "Net";
 
-    /// <summary>Режим из хранилища: none | host | client (регистр не важен).</summary>
-    public string Role { get; set; } = "none";
+    /// <summary>Режим из хранилища: host | client (none устарел; при сохранении выводится из RemoteHostIp).</summary>
+    public string Role { get; set; } = "host";
 
     /// <summary>Полное имя в UDP beacon: <c>DLSv1-product-instance</c> (см. <see cref="LanBeacon.LanBeaconName"/>).</summary>
     public string AppId { get; set; } = "";

@@ -30,6 +30,7 @@ public class NetDiscoverySettingsRepositoryTests
 
             await repo.EnsureInitializedAsync();
             DiscoveryOptions first = repo.GetCurrent();
+            Assert.Equal("host", first.Role);
             Assert.StartsWith("DLSv1-default-", first.AppId);
             Assert.Equal("default", first.ProductSlug);
             Assert.False(string.IsNullOrEmpty(first.InstanceSlug));

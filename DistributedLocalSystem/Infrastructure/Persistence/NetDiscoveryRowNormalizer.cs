@@ -16,6 +16,14 @@ internal static class NetDiscoveryRowNormalizer
 
     internal static void Normalize(NetDiscoverySettingsEntity e)
     {
+        if (string.Equals(e.Role, "none", StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrWhiteSpace(e.RemoteHostIp))
+            e.Role = "host";
+
+        if (string.Equals(e.Role, "client", StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrWhiteSpace(e.RemoteHostIp))
+            e.Role = "host";
+
         if (string.IsNullOrEmpty(e.InstanceGuid))
             e.InstanceGuid = Guid.NewGuid().ToString("N");
 

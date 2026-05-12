@@ -48,11 +48,11 @@ type AdminPanelTab = "current" | "change" | "lan";
 function roleLabel(role: NetConfiguredRole): string {
   switch (role) {
     case "host":
-      return "хост (beacon из appsettings)";
+      return "хост (вещание в LAN)";
     case "client":
-      return "клиент (поиск хоста из appsettings)";
+      return "клиент (подключение к удалённому узлу)";
     default:
-      return "выкл. (Role: none в appsettings)";
+      return "выкл.";
   }
 }
 
@@ -162,6 +162,10 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
     }
   }
 
+  function isConnectedToLanPeer(ip: string): boolean {
+    return net?.configuredRole === "client" && net?.remoteHostIp === ip;
+  }
+
   async function connectToLanPeer(ip: string) {
     if (!baseUrl || !configuration) return;
     setSavingConfiguration(true);
@@ -180,7 +184,24 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
       if (!response.ok) throw new Error(`configuration update ${response.status}`);
       const updatedConfiguration = (await response.json()) as DiscoveryOptions;
       setConfiguration(updatedConfiguration);
-      await Promise.all([fetchRole(), fetchStatus()]);
+      await Promise.all([fetchRole(), fetchStatus(), scanLanPeers()]);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setSavingConfiguration(false);
+    }
+  }
+
+  async function disconnectFromRemoteHost() {
+    if (!baseUrl) return;
+    setSavingConfiguration(true);
+    setError(null);
+    try {
+      const response = await fetch(`${baseUrl}/api/net/disconnect`, { method: "POST" });
+      if (!response.ok) throw new Error(`disconnect ${response.status}`);
+      const updatedConfiguration = (await response.json()) as DiscoveryOptions;
+      setConfiguration(updatedConfiguration);
+      await Promise.all([fetchRole(), fetchStatus(), scanLanPeers()]);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -284,7 +305,10 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
                   <p>
                     <strong>{roleLabel(configuredRole)}</strong>
                   </p>
-                  <p className="hint">Текущее значение role из конфигурации backend.</p>
+                  <p className="hint">
+                    Роль host/client выставляется автоматически: по умолчанию хост; при выборе узла в
+                    вкладке LAN — клиент; отключение — снова хост.
+                  </p>
                 </>
               )}
             </section>
@@ -336,18 +360,10 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
               <p className="muted">Загрузка текущей конфигурации…</p>
             ) : (
               <div className="admin-panel__form">
-                <label className="admin-panel__field">
-                  <span>Role</span>
-                  <select
-                    value={configuration.role}
-                    onChange={(e) => updateConfigurationField("role", e.target.value as NetConfiguredRole)}
-                  >
-                    <option value="none">none</option>
-                    <option value="host">host</option>
-                    <option value="client">client</option>
-                  </select>
-                </label>
-
+                <p className="hint">
+                  Роль host/client выставляется только автоматически: по умолчанию хост; подключение к
+                  узлу из вкладки LAN — клиент; «Отключиться» там же — снова хост.
+                </p>
                 <label className="admin-panel__field">
                   <span>Product slug (общий для линейки)</span>
                   <input
@@ -369,21 +385,6 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
                 <label className="admin-panel__field">
                   <span>Beacon AppId (пересобирается при сохранении)</span>
                   <input type="text" readOnly value={configuration.appId} />
-                </label>
-
-                <label className="admin-panel__field">
-                  <span>Remote host IP (client, без UDP)</span>
-                  <input
-                    type="text"
-                    value={configuration.remoteHostIp ?? ""}
-                    onChange={(e) =>
-                      updateConfigurationField(
-                        "remoteHostIp",
-                        e.target.value.trim() === "" ? null : e.target.value.trim(),
-                      )
-                    }
-                    placeholder="напр. 192.168.1.10"
-                  />
                 </label>
 
                 <label className="admin-panel__field">
@@ -453,8 +454,9 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
               </button>
             </div>
             <p className="hint">
-              Формат beacon: <code>DLSv1-&lt;productSlug&gt;-&lt;instanceSlug&gt;</code>. Подключение
-              переводит узел в режим client и задаёт <code>remoteHostIp</code> (без UDP-поиска).
+              Формат beacon: <code>DLSv1-&lt;productSlug&gt;-&lt;instanceSlug&gt;</code>. Собственный узел в
+              списке не показывается. «Подключиться» переводит в режим клиента к выбранному IP; у
+              активного подключения кнопка меняется на «Отключиться» (возврат в режим хоста).
             </p>
             {lanPeers.length === 0 && !lanLoading ? (
               <p className="muted">Узлы не найдены или список ещё не запрашивался.</p>
@@ -476,14 +478,25 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
                         <span className="muted"> ({p.beaconName})</span>
                       </td>
                       <td>
-                        <button
-                          type="button"
-                          className="btn-refresh"
-                          disabled={savingConfiguration || !configuration}
-                          onClick={() => void connectToLanPeer(p.ipAddress)}
-                        >
-                          Подключиться
-                        </button>
+                        {isConnectedToLanPeer(p.ipAddress) ? (
+                          <button
+                            type="button"
+                            className="btn-refresh"
+                            disabled={savingConfiguration}
+                            onClick={() => void disconnectFromRemoteHost()}
+                          >
+                            Отключиться
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn-refresh"
+                            disabled={savingConfiguration || !configuration}
+                            onClick={() => void connectToLanPeer(p.ipAddress)}
+                          >
+                            Подключиться
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}

@@ -13,7 +13,7 @@ public sealed class NetDiscoverySettingsEntity
     public int Id { get; set; } = SingleRowId;
 
     [MaxLength(32)]
-    public string Role { get; set; } = "client";
+    public string Role { get; set; } = "host";
 
     [MaxLength(256)]
     public string AppId { get; set; } = "";

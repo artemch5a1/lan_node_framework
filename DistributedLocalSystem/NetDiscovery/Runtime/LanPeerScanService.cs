@@ -1,8 +1,5 @@
 using System.Collections.Concurrent;
-using System.Net;
-using System.Net.Sockets;
-using DistributedLocalSystem.Core.Abstractions;
-using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
+using DistributedLocalSystem.Core.Abstractions;using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
 using DistributedLocalSystem.Core.Udp;
 using UdpDiscovery.Net;
 
@@ -39,7 +36,6 @@ public sealed class LanPeerScanService : ILanPeerScanService
         }
 
         ConcurrentDictionary<string, LanPeerSnapshot> map = new(StringComparer.Ordinal);
-        string? selfIp = TryGetPrimaryLanIPv4();
 
         void OnDiscovered(DiscoveredServer server)
         {
@@ -48,13 +44,10 @@ public sealed class LanPeerScanService : ILanPeerScanService
             if (!string.Equals(parsed.ProductSlug, product, StringComparison.Ordinal))
                 return;
 
-            string ip = server.IpAddress.ToString();
-            if (
-                ip == selfIp
-                && string.Equals(server.Name, _identity.ExpectedServiceName, StringComparison.Ordinal)
-            )
+            if (string.Equals(server.Name, _identity.ExpectedServiceName, StringComparison.Ordinal))
                 return;
 
+            string ip = server.IpAddress.ToString();
             string key = $"{ip}\u001f{server.Name}";
             map[key] = new LanPeerSnapshot(ip, server.Name, parsed.ProductSlug, parsed.InstanceSlug);
         }
@@ -82,30 +75,5 @@ public sealed class LanPeerScanService : ILanPeerScanService
         udp.ServerDiscovered -= OnDiscovered;
 
         return map.Values.ToArray();
-    }
-
-    private static string? TryGetPrimaryLanIPv4()
-    {
-        try
-        {
-            IPHostEntry host = Dns.GetHostEntry(Dns.GetHostName());
-            foreach (IPAddress a in host.AddressList)
-            {
-                if (a.AddressFamily != AddressFamily.InterNetwork)
-                    continue;
-                if (IPAddress.IsLoopback(a))
-                    continue;
-                string s = a.ToString();
-                if (s.StartsWith("169.254.", StringComparison.Ordinal))
-                    continue;
-                return s;
-            }
-        }
-        catch
-        {
-            // ignored
-        }
-
-        return null;
     }
 }

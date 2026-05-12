@@ -31,6 +31,7 @@ public sealed class NetDiscoverySettingsRepository : INetDiscoverySettingsReposi
     {
         DiscoveryOptions toPersist = NetDiscoverySettingsDefaults.Clone(newDiscoveryOptions);
         NetDiscoverySettingsDefaults.SyncComputedAppId(toPersist);
+        NetDiscoverySettingsDefaults.ApplyRoleFromRemoteHost(toPersist);
 
         await using DistributedLocalStorageContext db = await _factory
             .CreateDbContextAsync(cancellationToken)

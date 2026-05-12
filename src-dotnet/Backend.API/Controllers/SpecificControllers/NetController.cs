@@ -2,6 +2,7 @@ using System.Text.Json;
 using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.Infrastructure.Attributes;
 using DistributedLocalSystem.Core.NetDiscovery;
+using DistributedLocalSystem.Core.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
@@ -97,6 +98,28 @@ public class NetController : ControllerBase
             cancellationToken
         );
         await _reloadCoordinator.ReloadAsync(cancellationToken);
+        Response.ContentType = "application/json";
+
+        await JsonSerializer.SerializeAsync(
+            Response.Body,
+            updated,
+            _jsonOptions.Value.JsonSerializerOptions,
+            cancellationToken
+        );
+    }
+
+    /// <summary>Отключение от удалённого хоста: снова режим host (beacon), <c>RemoteHostIp</c> сбрасывается.</summary>
+    [HttpPost("disconnect")]
+    public async Task DisconnectFromRemoteHost(CancellationToken cancellationToken)
+    {
+        DiscoveryOptions current = _netService.GetCurrentConfiguration();
+        DiscoveryOptions next = NetDiscoverySettingsDefaults.Clone(current);
+        next.RemoteHostIp = null;
+        next.Role = "host";
+
+        DiscoveryOptions updated = await _netService.ChangeConfiguration(next, cancellationToken)
+            .ConfigureAwait(false);
+        await _reloadCoordinator.ReloadAsync(cancellationToken).ConfigureAwait(false);
         Response.ContentType = "application/json";
 
         await JsonSerializer.SerializeAsync(
