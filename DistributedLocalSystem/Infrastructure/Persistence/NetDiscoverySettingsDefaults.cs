@@ -13,7 +13,7 @@ public static class NetDiscoverySettingsDefaults
             Role = "client",
             AppId = "test-backend",
             UdpPort = 49000,
-            LanPort = 17000,
+            LanPort = 17891,
             BeaconIntervalMs = 2000,
             DiscoveryTimeoutMs = 5000,
             ProtocolVersion = 1,
