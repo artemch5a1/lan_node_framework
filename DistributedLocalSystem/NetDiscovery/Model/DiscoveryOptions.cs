@@ -8,7 +8,20 @@ public sealed class DiscoveryOptions
     /// <summary>Режим из хранилища: none | host | client (регистр не важен).</summary>
     public string Role { get; set; } = "none";
 
-    public string AppId { get; set; } = "op1-26";
+    /// <summary>Полное имя в UDP beacon: <c>DLSv1-product-instance</c> (см. <see cref="LanBeacon.LanBeaconName"/>).</summary>
+    public string AppId { get; set; } = "";
+
+    /// <summary>Общий slug продукта для всех экземпляров линейки.</summary>
+    public string ProductSlug { get; set; } = "";
+
+    /// <summary>Slug экземпляра (уникальность в LAN — best-effort).</summary>
+    public string InstanceSlug { get; set; } = "";
+
+    /// <summary>Стабильный идентификатор экземпляра (не участвует в beacon v1).</summary>
+    public string InstanceGuid { get; set; } = "";
+
+    /// <summary>Для режима client: явный LAN IP хоста (без UDP discovery).</summary>
+    public string? RemoteHostIp { get; set; }
     public int UdpPort { get; set; } = 49152;
     public int LanPort { get; set; } = 17891;
     public int BeaconIntervalMs { get; set; } = 2000;

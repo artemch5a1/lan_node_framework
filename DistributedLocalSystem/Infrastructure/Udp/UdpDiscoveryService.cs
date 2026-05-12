@@ -8,6 +8,7 @@ public sealed class UdpDiscoveryService : IHostedService, IDisposable
 {
     private readonly INetDiscoverySettingsRepository _settings;
     private readonly DiscoveryServiceIdentity _localIdentity;
+    private readonly LanUdpPeerFilterKind _peerFilterKind;
 
     public event Action<DiscoveredServer>? ServerDiscovered;
     public event Action<DiscoveredServer>? ServerLost;
@@ -21,11 +22,13 @@ public sealed class UdpDiscoveryService : IHostedService, IDisposable
 
     public UdpDiscoveryService(
         INetDiscoverySettingsRepository settings,
-        DiscoveryServiceIdentity localIdentity
+        DiscoveryServiceIdentity localIdentity,
+        LanUdpPeerFilterKind peerFilterKind
     )
     {
         _settings = settings;
         _localIdentity = localIdentity;
+        _peerFilterKind = peerFilterKind;
         _serverDiscoveryService = new ServerDiscoveryService(
             discoveryPort: (ushort)_settings.GetCurrent().UdpPort
         );
@@ -71,7 +74,7 @@ public sealed class UdpDiscoveryService : IHostedService, IDisposable
     {
         _serverDiscoveryService.OnServerDiscovered += (server) =>
         {
-            if (!_localIdentity.MatchesPeerAdvertisedName(server.Name))
+            if (!MatchesPeer(server.Name))
                 return;
 
             LastDiscoveredServerIp = server.IpAddress.ToString();
@@ -80,7 +83,7 @@ public sealed class UdpDiscoveryService : IHostedService, IDisposable
 
         _serverDiscoveryService.OnServerDisappeared += (server) =>
         {
-            if (!_localIdentity.MatchesPeerAdvertisedName(server.Name))
+            if (!MatchesPeer(server.Name))
                 return;
 
             ServerLost?.Invoke(server);
@@ -88,6 +91,14 @@ public sealed class UdpDiscoveryService : IHostedService, IDisposable
 
         await _serverDiscoveryService.StartDiscovery();
     }
+
+    private bool MatchesPeer(string? peerName) =>
+        _peerFilterKind switch
+        {
+            LanUdpPeerFilterKind.ExactBeaconName => _localIdentity.MatchesPeerExactBeacon(peerName),
+            LanUdpPeerFilterKind.SameProductSlug => _localIdentity.MatchesPeerSameProduct(peerName),
+            _ => false,
+        };
 
     public void Dispose()
     {

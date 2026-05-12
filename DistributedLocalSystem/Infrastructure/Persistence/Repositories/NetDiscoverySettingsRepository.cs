@@ -29,6 +29,9 @@ public sealed class NetDiscoverySettingsRepository : INetDiscoverySettingsReposi
         CancellationToken cancellationToken = default
     )
     {
+        DiscoveryOptions toPersist = NetDiscoverySettingsDefaults.Clone(newDiscoveryOptions);
+        NetDiscoverySettingsDefaults.SyncComputedAppId(toPersist);
+
         await using DistributedLocalStorageContext db = await _factory
             .CreateDbContextAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -36,16 +39,20 @@ public sealed class NetDiscoverySettingsRepository : INetDiscoverySettingsReposi
         int count = await db
             .NetDiscoverySettings.ExecuteUpdateAsync(
                 x =>
-                    x.SetProperty(i => i.AppId, newDiscoveryOptions.AppId)
-                        .SetProperty(i => i.BeaconIntervalMs, newDiscoveryOptions.BeaconIntervalMs)
+                    x.SetProperty(i => i.AppId, toPersist.AppId)
+                        .SetProperty(i => i.Role, toPersist.Role)
+                        .SetProperty(i => i.ProductSlug, toPersist.ProductSlug)
+                        .SetProperty(i => i.InstanceSlug, toPersist.InstanceSlug)
+                        .SetProperty(i => i.InstanceGuid, toPersist.InstanceGuid)
+                        .SetProperty(i => i.RemoteHostIp, toPersist.RemoteHostIp)
+                        .SetProperty(i => i.BeaconIntervalMs, toPersist.BeaconIntervalMs)
                         .SetProperty(
                             i => i.DiscoveryTimeoutMs,
-                            newDiscoveryOptions.DiscoveryTimeoutMs
+                            toPersist.DiscoveryTimeoutMs
                         )
-                        .SetProperty(i => i.LanPort, newDiscoveryOptions.LanPort)
-                        .SetProperty(i => i.ProtocolVersion, newDiscoveryOptions.ProtocolVersion)
-                        .SetProperty(i => i.Role, newDiscoveryOptions.Role)
-                        .SetProperty(i => i.UdpPort, newDiscoveryOptions.UdpPort),
+                        .SetProperty(i => i.LanPort, toPersist.LanPort)
+                        .SetProperty(i => i.ProtocolVersion, toPersist.ProtocolVersion)
+                        .SetProperty(i => i.UdpPort, toPersist.UdpPort),
                 cancellationToken: cancellationToken
             )
             .ConfigureAwait(false);
@@ -114,10 +121,11 @@ public sealed class NetDiscoverySettingsRepository : INetDiscoverySettingsReposi
             .ConfigureAwait(false);
 
         await db.Database.EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
+        await NetDiscoverySqliteSchema.ApplyPendingColumnAddsAsync(db, cancellationToken)
+            .ConfigureAwait(false);
 
         NetDiscoverySettingsEntity? row = await db
-            .NetDiscoverySettings.AsNoTracking()
-            .FirstOrDefaultAsync(
+            .NetDiscoverySettings.FirstOrDefaultAsync(
                 x => x.Id == NetDiscoverySettingsEntity.SingleRowId,
                 cancellationToken
             )
@@ -131,6 +139,11 @@ public sealed class NetDiscoverySettingsRepository : INetDiscoverySettingsReposi
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             row = seed;
             seeded = true;
+        }
+        else
+        {
+            NetDiscoveryRowNormalizer.Normalize(row);
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
 
         DiscoveryOptions mapped = NetDiscoverySettingsDefaults.ToDiscoveryOptions(row);

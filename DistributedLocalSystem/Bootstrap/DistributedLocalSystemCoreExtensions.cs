@@ -43,6 +43,7 @@ public static class DistributedLocalSystemCoreExtensions
         );
 
         services.AddSingleton<NetDiscoveryService>();
+        services.AddSingleton<ILanPeerScanService, LanPeerScanService>();
         services.AddSingleton<
             INetDiscoveryConfigurationReloadCoordinator,
             NetDiscoveryConfigurationReloadCoordinator

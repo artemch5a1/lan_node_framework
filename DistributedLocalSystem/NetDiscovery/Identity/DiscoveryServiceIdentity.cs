@@ -1,4 +1,5 @@
 using DistributedLocalSystem.Core.Abstractions;
+using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
 
 namespace DistributedLocalSystem.Core.NetDiscovery;
 
@@ -33,7 +34,21 @@ public sealed class DiscoveryServiceIdentity
             ? (_settings.GetCurrent().AppId ?? string.Empty).Trim()
             : _fixedExpectedServiceName ?? string.Empty;
 
-    /// <summary>Объявленное удалённым узлом имя совпадает с нашим (игнорируем чужие beacon’ы).</summary>
-    public bool MatchesPeerAdvertisedName(string? peerServiceName) =>
+    /// <summary>Полное совпадение beacon-строки (коллизия хоста, legacy single AppId).</summary>
+    public bool MatchesPeerExactBeacon(string? peerServiceName) =>
         string.Equals(peerServiceName, ExpectedServiceName, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Тот же product slug в формате <see cref="LanBeaconName"/>; для legacy-имени без DLS — точное совпадение с <see cref="ExpectedServiceName"/>.
+    /// </summary>
+    public bool MatchesPeerSameProduct(string? peerServiceName)
+    {
+        if (!LanBeaconName.TryParse(ExpectedServiceName, out LanBeaconParsed local))
+            return MatchesPeerExactBeacon(peerServiceName);
+
+        if (!LanBeaconName.TryParse(peerServiceName, out LanBeaconParsed remote))
+            return false;
+
+        return string.Equals(local.ProductSlug, remote.ProductSlug, StringComparison.Ordinal);
+    }
 }

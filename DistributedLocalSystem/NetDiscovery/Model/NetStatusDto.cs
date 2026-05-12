@@ -9,5 +9,8 @@ public sealed record NetStatusDto(
     string? RemoteHostBaseUrl,
     int LanPort,
     int UdpPort,
-    string AppId
+    string AppId,
+    string ProductSlug,
+    string InstanceSlug,
+    string InstanceGuid
 );

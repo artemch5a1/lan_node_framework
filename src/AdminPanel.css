@@ -77,6 +77,24 @@
   margin-bottom: 0;
 }
 
+.admin-panel__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.admin-panel__table th,
+.admin-panel__table td {
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.admin-panel__table th {
+  font-weight: 600;
+}
+
 @media (prefers-color-scheme: light) {
   .admin-panel {
     background: rgba(245, 245, 248, 0.98);

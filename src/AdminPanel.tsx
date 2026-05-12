@@ -17,11 +17,18 @@ type NetStatus = {
   lanPort: number;
   udpPort: number;
   appId: string;
+  productSlug: string;
+  instanceSlug: string;
+  instanceGuid: string;
 };
 
 type DiscoveryOptions = {
   role: NetConfiguredRole;
   appId: string;
+  productSlug: string;
+  instanceSlug: string;
+  instanceGuid: string;
+  remoteHostIp: string | null;
   udpPort: number;
   lanPort: number;
   beaconIntervalMs: number;
@@ -29,7 +36,14 @@ type DiscoveryOptions = {
   protocolVersion: number;
 };
 
-type AdminPanelTab = "current" | "change";
+type LanPeerSnapshot = {
+  ipAddress: string;
+  beaconName: string;
+  productSlug: string;
+  instanceSlug: string;
+};
+
+type AdminPanelTab = "current" | "change" | "lan";
 
 function roleLabel(role: NetConfiguredRole): string {
   switch (role) {
@@ -67,6 +81,8 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [savingConfiguration, setSavingConfiguration] = useState(false);
+  const [lanPeers, setLanPeers] = useState<LanPeerSnapshot[]>([]);
+  const [lanLoading, setLanLoading] = useState(false);
 
   const toggle = useCallback(() => {
     setOpen((v) => !v);
@@ -127,6 +143,48 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
       setError(String(e));
     } finally {
       setRefreshing(false);
+    }
+  }
+
+  async function scanLanPeers() {
+    if (!baseUrl) return;
+    setLanLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${baseUrl}/api/net/lan-peers`);
+      if (!response.ok) throw new Error(`lan-peers ${response.status}`);
+      const data = (await response.json()) as LanPeerSnapshot[];
+      setLanPeers(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLanLoading(false);
+    }
+  }
+
+  async function connectToLanPeer(ip: string) {
+    if (!baseUrl || !configuration) return;
+    setSavingConfiguration(true);
+    setError(null);
+    try {
+      const body: DiscoveryOptions = {
+        ...configuration,
+        role: "client",
+        remoteHostIp: ip,
+      };
+      const response = await fetch(`${baseUrl}/api/net/configuration`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) throw new Error(`configuration update ${response.status}`);
+      const updatedConfiguration = (await response.json()) as DiscoveryOptions;
+      setConfiguration(updatedConfiguration);
+      await Promise.all([fetchRole(), fetchStatus()]);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setSavingConfiguration(false);
     }
   }
 
@@ -191,6 +249,16 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
           >
             Смена конфигурации
           </button>
+          <button
+            type="button"
+            className={`admin-panel__menu-btn ${activeTab === "lan" ? "admin-panel__menu-btn--active" : ""}`}
+            onClick={() => {
+              setActiveTab("lan");
+              void scanLanPeers();
+            }}
+          >
+            LAN
+          </button>
         </section>
 
         {activeTab === "current" && (
@@ -237,8 +305,14 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
                   <dd>
                     {net.udpPort} / {net.lanPort}
                   </dd>
-                  <dt>appId</dt>
+                  <dt>appId (beacon)</dt>
                   <dd>{net.appId}</dd>
+                  <dt>productSlug</dt>
+                  <dd>{net.productSlug || "—"}</dd>
+                  <dt>instanceSlug</dt>
+                  <dd>{net.instanceSlug || "—"}</dd>
+                  <dt>instanceGuid</dt>
+                  <dd>{net.instanceGuid || "—"}</dd>
                 </dl>
               </section>
             )}
@@ -275,11 +349,40 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
                 </label>
 
                 <label className="admin-panel__field">
-                  <span>AppId</span>
+                  <span>Product slug (общий для линейки)</span>
                   <input
                     type="text"
-                    value={configuration.appId}
-                    onChange={(e) => updateConfigurationField("appId", e.target.value)}
+                    value={configuration.productSlug}
+                    onChange={(e) => updateConfigurationField("productSlug", e.target.value)}
+                  />
+                </label>
+
+                <label className="admin-panel__field">
+                  <span>Instance slug (экземпляр, [a-z0-9])</span>
+                  <input
+                    type="text"
+                    value={configuration.instanceSlug}
+                    onChange={(e) => updateConfigurationField("instanceSlug", e.target.value)}
+                  />
+                </label>
+
+                <label className="admin-panel__field">
+                  <span>Beacon AppId (пересобирается при сохранении)</span>
+                  <input type="text" readOnly value={configuration.appId} />
+                </label>
+
+                <label className="admin-panel__field">
+                  <span>Remote host IP (client, без UDP)</span>
+                  <input
+                    type="text"
+                    value={configuration.remoteHostIp ?? ""}
+                    onChange={(e) =>
+                      updateConfigurationField(
+                        "remoteHostIp",
+                        e.target.value.trim() === "" ? null : e.target.value.trim(),
+                      )
+                    }
+                    placeholder="напр. 192.168.1.10"
                   />
                 </label>
 
@@ -332,6 +435,60 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
                   />
                 </label>
               </div>
+            )}
+          </section>
+        )}
+
+        {activeTab === "lan" && (
+          <section className="card admin-panel__card">
+            <div className="row card-header-row">
+              <h2>Узлы в LAN (тот же productSlug)</h2>
+              <button
+                type="button"
+                className="btn-refresh"
+                disabled={!baseUrl || lanLoading}
+                onClick={() => void scanLanPeers()}
+              >
+                {lanLoading ? "Сканирование…" : "Обновить"}
+              </button>
+            </div>
+            <p className="hint">
+              Формат beacon: <code>DLSv1-&lt;productSlug&gt;-&lt;instanceSlug&gt;</code>. Подключение
+              переводит узел в режим client и задаёт <code>remoteHostIp</code> (без UDP-поиска).
+            </p>
+            {lanPeers.length === 0 && !lanLoading ? (
+              <p className="muted">Узлы не найдены или список ещё не запрашивался.</p>
+            ) : (
+              <table className="admin-panel__table">
+                <thead>
+                  <tr>
+                    <th>IP</th>
+                    <th>Экземпляр</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {lanPeers.map((p) => (
+                    <tr key={`${p.ipAddress}-${p.beaconName}`}>
+                      <td>{p.ipAddress}</td>
+                      <td>
+                        <code>{p.instanceSlug}</code>
+                        <span className="muted"> ({p.beaconName})</span>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-refresh"
+                          disabled={savingConfiguration || !configuration}
+                          onClick={() => void connectToLanPeer(p.ipAddress)}
+                        >
+                          Подключиться
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </section>
         )}

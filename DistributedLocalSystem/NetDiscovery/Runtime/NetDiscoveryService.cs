@@ -83,7 +83,10 @@ public sealed class NetDiscoveryService : IDisposable
                 RemoteHostBaseUrl: BuildRemoteBaseUrl(),
                 LanPort: opt.LanPort,
                 UdpPort: opt.UdpPort,
-                AppId: opt.AppId
+                AppId: opt.AppId,
+                ProductSlug: opt.ProductSlug,
+                InstanceSlug: opt.InstanceSlug,
+                InstanceGuid: opt.InstanceGuid
             );
         }
     }
@@ -134,7 +137,11 @@ public sealed class NetDiscoveryService : IDisposable
 
     private bool DetectExistingHostBeforeBeaconStart(DiscoveryOptions opt)
     {
-        using UdpDiscoveryService probe = new(_settings, _localIdentity);
+        using UdpDiscoveryService probe = new(
+            _settings,
+            _localIdentity,
+            LanUdpPeerFilterKind.ExactBeaconName
+        );
         using CancellationTokenSource timeoutCts = new(
             TimeSpan.FromMilliseconds(opt.DiscoveryTimeoutMs)
         );
@@ -190,10 +197,32 @@ public sealed class NetDiscoveryService : IDisposable
             ClearRemotePeer();
             _thisHostIp = GetPrimaryLanIPv4();
 
+            string? fixedIp = opt.RemoteHostIp?.Trim();
+            if (
+                !string.IsNullOrEmpty(fixedIp)
+                && IPAddress.TryParse(fixedIp, out IPAddress? parsedAddr)
+                && parsedAddr is not null
+            )
+            {
+                _state = NetDiscoveryState.ClientConnected;
+                _remoteHostIp = fixedIp;
+                _remoteTcpPort = opt.LanPort;
+                _log.LogInformation(
+                    "Net: client mode, fixed remote host {Host}:{Tcp} (no UDP discovery)",
+                    fixedIp,
+                    opt.LanPort
+                );
+                return;
+            }
+
             _runCts = new CancellationTokenSource();
             CancellationToken token = _runCts.Token;
 
-            UdpDiscoveryService discovery = new(_settings, _localIdentity);
+            UdpDiscoveryService discovery = new(
+                _settings,
+                _localIdentity,
+                LanUdpPeerFilterKind.SameProductSlug
+            );
             _clientDiscovery = discovery;
 
             TaskCompletionSource<DiscoveredServer> tcs = new(

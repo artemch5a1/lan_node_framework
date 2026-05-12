@@ -18,6 +18,18 @@ public sealed class NetDiscoverySettingsEntity
     [MaxLength(256)]
     public string AppId { get; set; } = "";
 
+    [MaxLength(48)]
+    public string ProductSlug { get; set; } = "";
+
+    [MaxLength(48)]
+    public string InstanceSlug { get; set; } = "";
+
+    [MaxLength(64)]
+    public string InstanceGuid { get; set; } = "";
+
+    [MaxLength(45)]
+    public string? RemoteHostIp { get; set; }
+
     public int UdpPort { get; set; }
 
     public int LanPort { get; set; }

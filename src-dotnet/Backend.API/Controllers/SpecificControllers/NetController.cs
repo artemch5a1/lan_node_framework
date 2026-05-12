@@ -12,16 +12,19 @@ public class NetController : ControllerBase
 {
     private readonly NetDiscoveryService _netService;
     private readonly INetDiscoveryConfigurationReloadCoordinator _reloadCoordinator;
+    private readonly ILanPeerScanService _lanPeerScan;
     private readonly IOptions<JsonOptions> _jsonOptions;
 
     public NetController(
         NetDiscoveryService netService,
         INetDiscoveryConfigurationReloadCoordinator reloadCoordinator,
+        ILanPeerScanService lanPeerScan,
         IOptions<JsonOptions> jsonOptions
     )
     {
         _netService = netService;
         _reloadCoordinator = reloadCoordinator;
+        _lanPeerScan = lanPeerScan;
         _jsonOptions = jsonOptions;
     }
 
@@ -48,6 +51,22 @@ public class NetController : ControllerBase
         await JsonSerializer.SerializeAsync(
             Response.Body,
             new { role = status.ConfiguredRole },
+            _jsonOptions.Value.JsonSerializerOptions,
+            cancellationToken
+        );
+    }
+
+    [HttpGet("lan-peers")]
+    public async Task GetLanPeers(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<LanPeerSnapshot> peers = await _lanPeerScan
+            .ScanAsync(cancellationToken)
+            .ConfigureAwait(false);
+        Response.ContentType = "application/json";
+
+        await JsonSerializer.SerializeAsync(
+            Response.Body,
+            peers,
             _jsonOptions.Value.JsonSerializerOptions,
             cancellationToken
         );

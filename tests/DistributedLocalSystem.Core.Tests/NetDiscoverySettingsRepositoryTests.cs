@@ -30,8 +30,11 @@ public class NetDiscoverySettingsRepositoryTests
 
             await repo.EnsureInitializedAsync();
             DiscoveryOptions first = repo.GetCurrent();
-            Assert.Equal("op1-26", first.AppId);
-            Assert.Equal(49152, first.UdpPort);
+            Assert.StartsWith("DLSv1-default-", first.AppId);
+            Assert.Equal("default", first.ProductSlug);
+            Assert.False(string.IsNullOrEmpty(first.InstanceSlug));
+            Assert.False(string.IsNullOrEmpty(first.InstanceGuid));
+            Assert.Equal(49000, first.UdpPort);
 
             DiscoveryOptions second = await repo.ReloadFromDatabaseAsync();
             Assert.Equal(first.AppId, second.AppId);
