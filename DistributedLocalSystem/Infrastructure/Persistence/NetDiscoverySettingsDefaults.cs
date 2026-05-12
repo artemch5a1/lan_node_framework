@@ -11,9 +11,9 @@ public static class NetDiscoverySettingsDefaults
         {
             Id = NetDiscoverySettingsEntity.SingleRowId,
             Role = "client",
-            AppId = "op1-26",
-            UdpPort = 49152,
-            LanPort = 17891,
+            AppId = "test-backend",
+            UdpPort = 49000,
+            LanPort = 17000,
             BeaconIntervalMs = 2000,
             DiscoveryTimeoutMs = 5000,
             ProtocolVersion = 1,
