@@ -47,10 +47,7 @@ public sealed class NetDiscoverySettingsRepository : INetDiscoverySettingsReposi
                         .SetProperty(i => i.InstanceGuid, toPersist.InstanceGuid)
                         .SetProperty(i => i.RemoteHostIp, toPersist.RemoteHostIp)
                         .SetProperty(i => i.BeaconIntervalMs, toPersist.BeaconIntervalMs)
-                        .SetProperty(
-                            i => i.DiscoveryTimeoutMs,
-                            toPersist.DiscoveryTimeoutMs
-                        )
+                        .SetProperty(i => i.DiscoveryTimeoutMs, toPersist.DiscoveryTimeoutMs)
                         .SetProperty(i => i.LanPort, toPersist.LanPort)
                         .SetProperty(i => i.ProtocolVersion, toPersist.ProtocolVersion)
                         .SetProperty(i => i.UdpPort, toPersist.UdpPort),
@@ -122,7 +119,8 @@ public sealed class NetDiscoverySettingsRepository : INetDiscoverySettingsReposi
             .ConfigureAwait(false);
 
         await db.Database.EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
-        await NetDiscoverySqliteSchema.ApplyPendingColumnAddsAsync(db, cancellationToken)
+        await NetDiscoverySqliteSchema
+            .ApplyPendingColumnAddsAsync(db, cancellationToken)
             .ConfigureAwait(false);
 
         NetDiscoverySettingsEntity? row = await db

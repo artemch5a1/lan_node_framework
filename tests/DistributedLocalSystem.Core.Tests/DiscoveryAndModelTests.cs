@@ -1,8 +1,8 @@
 using System.Net;
 using System.Reflection;
+using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.NetDiscovery;
 using DistributedLocalSystem.Core.Persistence;
-using DistributedLocalSystem.Core.Abstractions;
 using Microsoft.Extensions.Logging.Abstractions;
 using UdpDiscovery.Net;
 

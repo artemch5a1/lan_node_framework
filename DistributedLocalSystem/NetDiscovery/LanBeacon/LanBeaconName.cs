@@ -83,4 +83,8 @@ public static partial class LanBeaconName
     }
 }
 
-public readonly record struct LanBeaconParsed(string ProductSlug, string InstanceSlug, string FullName);
+public readonly record struct LanBeaconParsed(
+    string ProductSlug,
+    string InstanceSlug,
+    string FullName
+);

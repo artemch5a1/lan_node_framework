@@ -40,9 +40,12 @@ internal static class NetDiscoverySqliteSchema
             cols.Add(columnName);
         }
 
-        await AddColumnIfMissingAsync("ProductSlug", "TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);
-        await AddColumnIfMissingAsync("InstanceSlug", "TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);
-        await AddColumnIfMissingAsync("InstanceGuid", "TEXT NOT NULL DEFAULT ''").ConfigureAwait(false);
+        await AddColumnIfMissingAsync("ProductSlug", "TEXT NOT NULL DEFAULT ''")
+            .ConfigureAwait(false);
+        await AddColumnIfMissingAsync("InstanceSlug", "TEXT NOT NULL DEFAULT ''")
+            .ConfigureAwait(false);
+        await AddColumnIfMissingAsync("InstanceGuid", "TEXT NOT NULL DEFAULT ''")
+            .ConfigureAwait(false);
         await AddColumnIfMissingAsync("RemoteHostIp", "TEXT NULL").ConfigureAwait(false);
     }
 }

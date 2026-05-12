@@ -117,7 +117,8 @@ public class NetController : ControllerBase
         next.RemoteHostIp = null;
         next.Role = "host";
 
-        DiscoveryOptions updated = await _netService.ChangeConfiguration(next, cancellationToken)
+        DiscoveryOptions updated = await _netService
+            .ChangeConfiguration(next, cancellationToken)
             .ConfigureAwait(false);
         await _reloadCoordinator.ReloadAsync(cancellationToken).ConfigureAwait(false);
         Response.ContentType = "application/json";

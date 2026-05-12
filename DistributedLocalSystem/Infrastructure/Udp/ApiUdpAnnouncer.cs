@@ -1,5 +1,5 @@
-using DistributedLocalSystem.Core.NetDiscovery;
 using DistributedLocalSystem.Core.Abstractions;
+using DistributedLocalSystem.Core.NetDiscovery;
 
 namespace DistributedLocalSystem.Core.Udp;
 

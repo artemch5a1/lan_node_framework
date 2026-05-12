@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
-using DistributedLocalSystem.Core.Abstractions;using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
+using DistributedLocalSystem.Core.Abstractions;
+using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
 using DistributedLocalSystem.Core.Udp;
 using UdpDiscovery.Net;
 
@@ -49,7 +50,12 @@ public sealed class LanPeerScanService : ILanPeerScanService
 
             string ip = server.IpAddress.ToString();
             string key = $"{ip}\u001f{server.Name}";
-            map[key] = new LanPeerSnapshot(ip, server.Name, parsed.ProductSlug, parsed.InstanceSlug);
+            map[key] = new LanPeerSnapshot(
+                ip,
+                server.Name,
+                parsed.ProductSlug,
+                parsed.InstanceSlug
+            );
         }
 
         using var udp = new UdpDiscoveryService(
