@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import "./AdminPanel.css";
 
 type NetConfiguredRole = "none" | "host" | "client";
@@ -41,7 +41,29 @@ type LanPeerSnapshot = {
   beaconName: string;
   productSlug: string;
   instanceSlug: string;
+  /** false — сохранённое подключение, в эфире сейчас не видно */
+  seenInDiscovery?: boolean;
 };
+
+/** Пока нет ответа сканирования — показываем текущий remote, чтобы можно было отключиться. */
+function mergeLanPeersWithStickyConnection(
+  peers: LanPeerSnapshot[],
+  net: NetStatus | null,
+): LanPeerSnapshot[] {
+  if (!net || net.configuredRole !== "client" || !net.remoteHostIp) return peers;
+  const ip = net.remoteHostIp.trim();
+  if (!ip || peers.some((p) => p.ipAddress === ip)) return peers;
+  return [
+    {
+      ipAddress: ip,
+      beaconName: "—",
+      productSlug: net.productSlug ?? "",
+      instanceSlug: "(нет в эфире)",
+      seenInDiscovery: false,
+    },
+    ...peers,
+  ];
+}
 
 type AdminPanelTab = "current" | "change" | "lan";
 
@@ -83,6 +105,11 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
   const [savingConfiguration, setSavingConfiguration] = useState(false);
   const [lanPeers, setLanPeers] = useState<LanPeerSnapshot[]>([]);
   const [lanLoading, setLanLoading] = useState(false);
+
+  const lanPeersDisplay = useMemo(
+    () => mergeLanPeersWithStickyConnection(lanPeers, net),
+    [lanPeers, net],
+  );
 
   const toggle = useCallback(() => {
     setOpen((v) => !v);
@@ -455,10 +482,12 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
             </div>
             <p className="hint">
               Формат beacon: <code>DLSv1-&lt;productSlug&gt;-&lt;instanceSlug&gt;</code>. Собственный узел в
-              списке не показывается. «Подключиться» переводит в режим клиента к выбранному IP; у
-              активного подключения кнопка меняется на «Отключиться» (возврат в режим хоста).
+              списке не показывается. Текущее подключение остаётся в таблице даже без beacon (строка «нет
+              в эфире»), чтобы можно было отключиться. «Подключиться» / «Отключиться» — как раньше.
             </p>
-            {lanPeers.length === 0 && !lanLoading ? (
+            {lanLoading && lanPeersDisplay.length === 0 ? (
+              <p className="muted">Сканирование…</p>
+            ) : lanPeersDisplay.length === 0 ? (
               <p className="muted">Узлы не найдены или список ещё не запрашивался.</p>
             ) : (
               <table className="admin-panel__table">
@@ -470,8 +499,8 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {lanPeers.map((p) => (
-                    <tr key={`${p.ipAddress}-${p.beaconName}`}>
+                  {lanPeersDisplay.map((p) => (
+                    <tr key={p.seenInDiscovery === false ? `${p.ipAddress}__sticky` : `${p.ipAddress}-${p.beaconName}`}>
                       <td>{p.ipAddress}</td>
                       <td>
                         <code>{p.instanceSlug}</code>
