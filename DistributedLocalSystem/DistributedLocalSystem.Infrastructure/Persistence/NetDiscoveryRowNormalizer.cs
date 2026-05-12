@@ -1,7 +1,7 @@
 using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
-using DistributedLocalSystem.Core.Persistence.Entities;
+using DistributedLocalSystem.Infrastructure.Persistence.Entities;
 
-namespace DistributedLocalSystem.Core.Persistence;
+namespace DistributedLocalSystem.Infrastructure.Persistence;
 
 internal static class NetDiscoveryRowNormalizer
 {

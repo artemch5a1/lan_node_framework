@@ -1,9 +1,11 @@
 using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.NetDiscovery;
-using DistributedLocalSystem.Core.Persistence.Entities;
+using DistributedLocalSystem.Core.Persistence;
+using DistributedLocalSystem.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
-namespace DistributedLocalSystem.Core.Persistence.Repositories;
+namespace DistributedLocalSystem.Infrastructure.Persistence.Repositories;
 
 public sealed class NetDiscoverySettingsRepository : INetDiscoverySettingsRepository
 {

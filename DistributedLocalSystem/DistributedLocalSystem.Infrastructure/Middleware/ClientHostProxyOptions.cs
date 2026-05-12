@@ -1,4 +1,4 @@
-namespace DistributedLocalSystem.Core.Infrastructure.Middleware;
+namespace DistributedLocalSystem.Infrastructure.Middleware;
 
 public class ClientHostProxyOptions
 {

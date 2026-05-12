@@ -1,7 +1,7 @@
-using DistributedLocalSystem.Core.Persistence.Entities;
+using DistributedLocalSystem.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace DistributedLocalSystem.Core.Persistence;
+namespace DistributedLocalSystem.Infrastructure.Persistence;
 
 public sealed class DistributedLocalStorageContext : DbContext
 {

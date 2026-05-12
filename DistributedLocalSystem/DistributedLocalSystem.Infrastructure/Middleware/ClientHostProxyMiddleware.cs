@@ -1,10 +1,12 @@
 using System.Net.Http.Headers;
-using DistributedLocalSystem.Core.Infrastructure.Attributes;
-using DistributedLocalSystem.Core.Infrastructure.Middleware;
 using DistributedLocalSystem.Core.NetDiscovery;
+using DistributedLocalSystem.Infrastructure.Attributes;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 
-namespace DistributedLocalSystem.Core.Middleware;
+namespace DistributedLocalSystem.Infrastructure.Middleware;
 
 /// <summary>
 /// В режиме клиента с найденным хостом пересылает HTTP на LAN-хост, кроме служебных путей (health, net API).

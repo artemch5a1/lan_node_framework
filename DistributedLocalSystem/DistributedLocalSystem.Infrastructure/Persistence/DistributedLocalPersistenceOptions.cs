@@ -1,4 +1,4 @@
-namespace DistributedLocalSystem.Core.Persistence;
+namespace DistributedLocalSystem.Infrastructure.Persistence;
 
 public sealed class DistributedLocalPersistenceOptions
 {

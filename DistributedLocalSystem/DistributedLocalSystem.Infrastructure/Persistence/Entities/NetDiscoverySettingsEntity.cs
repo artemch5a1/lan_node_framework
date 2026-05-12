@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace DistributedLocalSystem.Core.Persistence.Entities;
+namespace DistributedLocalSystem.Infrastructure.Persistence.Entities;
 
 [Table("net_discovery_settings")]
 public sealed class NetDiscoverySettingsEntity

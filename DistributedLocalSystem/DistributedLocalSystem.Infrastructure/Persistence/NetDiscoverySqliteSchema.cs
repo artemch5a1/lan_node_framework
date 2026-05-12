@@ -1,7 +1,7 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace DistributedLocalSystem.Core.Persistence;
+namespace DistributedLocalSystem.Infrastructure.Persistence;
 
 /// <summary>
 /// Добавляет колонки к существующей SQLite-таблице (проект использует <see cref="DatabaseFacade.EnsureCreatedAsync"/>, без EF Migrations).

@@ -1,7 +1,8 @@
 using System.Net;
 using DistributedLocalSystem.Core.NetDiscovery;
 using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
-using DistributedLocalSystem.Core.Persistence.Entities;
+using DistributedLocalSystem.Infrastructure.Persistence;
+using DistributedLocalSystem.Infrastructure.Persistence.Entities;
 
 namespace DistributedLocalSystem.Core.Persistence;
 

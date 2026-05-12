@@ -1,8 +1,9 @@
 using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.NetDiscovery;
+using Microsoft.Extensions.Hosting;
 using UdpDiscovery.Net;
 
-namespace DistributedLocalSystem.Core.Udp;
+namespace DistributedLocalSystem.Infrastructure.Udp;
 
 public sealed class UdpDiscoveryService : IHostedService, IDisposable
 {
