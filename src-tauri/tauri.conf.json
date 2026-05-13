@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "op-1-26_non-standard_situations",
+  "productName": "LAN Node Framework",
   "version": "0.1.0",
-  "identifier": "com.op-1-26-non-standard-situations.app",
+  "identifier": "dev.lan_node_framework.template",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "op-1-26_non-standard_situations",
+        "title": "LAN Node Framework",
         "width": 800,
         "height": 600
       }

@@ -1,15 +1,30 @@
-# OP-1-26 Non-standard Situations
+# LAN Node Framework (`lan_node_framework`)
 
-Десктопное клиент-серверное приложение: **Tauri 2** (оболочка + запуск backend), **React 18** + **TypeScript** + **Vite** (интерфейс), **ASP.NET Core** (HTTP API и логика узла в LAN).
+Шаблон **локального клиент-серверного** десктоп-приложения: оболочка **Tauri 2** поднимает рядом **ASP.NET Core** API на `127.0.0.1`, фронтенд **React 18 + TypeScript + Vite** ходит к нему по HTTP и забирает базовый URL через `invoke`. Репозиторий и файл решения Visual Studio: **`lan_node_framework.sln`**.
 
-Backend публикуется как **self-contained single-file** и укладывается в ресурсы приложения, чтобы на целевой машине не требовался установленный .NET Runtime.
+Этот репозиторий не «готовый продукт», а **стартовая точка**: слои уже разделены, есть пример доменного API и UI для сетевого узла в LAN — дальше вы подставляете свою бизнес-логику и брендинг.
 
 ---
 
-## Возможности интерфейса
+## Для чего шаблон
 
-- Запрос списка книг с локального API (`GET /api/Books`).
-- **Админ-панель** (Ctrl+Shift и клавиша **Backquote** — на US-клавиатуре обычно над Tab, на русской часто совпадает с **Ё**): режим узла, конфигурация discovery, сканирование LAN и подключение к пиру; ошибки показываются **тостами**; при открытии панели основной контент затемняется полупрозрачной подложкой.
+- Один установочный пакет: **веб-UI + встроенный backend** без отдельной установки .NET на машине пользователя (публикация **self-contained single-file**).
+- Работа **только в локальной сети / на localhost**: типичный сценарий — киоск, цех, лаборатория, офлайн-контур, где сервер крутится на той же машине или рядом в LAN.
+- Готовая связка **оболочка ↔ дочерний процесс**: свободный порт, переменная `BACKEND_HTTP_BASE_URL`, ожидание `GET /health`, корректное завершение процесса при выходе.
+
+---
+
+## Специфика шаблона (что уже заложено)
+
+| Область | Что сделано |
+|--------|-------------|
+| **Связка Tauri ↔ .NET** | Поиск `Backend.API` через `BACKEND_EXECUTABLE`, bundle в `src-tauri/binaries/backend/...`, резервный путь рядом с `.exe`; передача базового URL в процесс и опрос здоровья перед стартом UI. |
+| **Фронтенд** | Слои `api` / `stores` (Context) / `services` (уведомления) / `components` + `ui` (тосты); пример запроса книг и админ-панели. |
+| **Backend** | Слои `Backend.*` + вынесенный пакет **DistributedLocalSystem** (discovery, beacon, LAN, прокси клиент↔хост); контроллеры `Books`, `Net`; Swagger в Development. |
+| **Сеть** | API вида `/api/net/...` (роль, статус, конфигурация, пиры, disconnect); в UI — вкладки и тосты об ошибках, подложка при открытой админ-панели. |
+| **Сборка** | Скрипты `build:win-x64` / `build:linux-x64` и merge-конфиги Tauri только с нужным бинарником платформы. |
+
+Что **намеренно остаётся за вами** при форке: `identifier` и `productName` в `src-tauri/tauri.conf.json`, имя npm-пакета в `package.json`, идентификаторы в сторах/логах, политика безопасности (CSP, capabilities Tauri), реальная авторизация и контракты API под ваш продукт.
 
 ---
 
@@ -17,38 +32,40 @@ Backend публикуется как **self-contained single-file** и укла
 
 | Путь | Назначение |
 |------|------------|
-| `src/` | Фронтенд: React-приложение |
-| `src/app/` | Корень UI: провайдеры, страница `App` |
-| `src/api/` | Вызовы HTTP и Tauri (`booksApi`, `netApi`, `tauriBackendApi`, типы DTO) |
-| `src/stores/` | Состояние через React Context: сессия backend, книги, админка / сеть |
-| `src/services/` | Сервис уведомлений и форматирование текстов ошибок |
-| `src/components/` | Компоненты отрисовки (в т.ч. админ-панель: контейнер + «чистый» view) |
-| `src/ui/` | Общие UI-обёртки (например, тосты) |
-| `src/domain/` | Чистая доменная логика без React |
-| `src-dotnet/` | Решение .NET: `Backend.API`, слои Application / Infrastructure |
-| `src-tauri/` | Rust-оболочка Tauri, sidecar backend, конфиги bundle |
+| `lan_node_framework.sln` | Решение Visual Studio (.NET + тесты) |
+| `src/` | React: `app/`, `api/`, `stores/`, `services/`, `components/`, `ui/`, `domain/` |
+| `src-dotnet/` | `Backend.API` и слои приложения |
+| `DistributedLocalSystem/` | Общая подсистема discovery / LAN |
+| `src-tauri/` | Rust, `tauri.conf.json`, bundle backend |
+
+---
+
+## Возможности демо-UI
+
+- Запрос списка книг: `GET /api/Books`.
+- **Админ-панель** (Ctrl+Shift и клавиша **Backquote**): режим узла, конфигурация discovery, LAN, подключение к пиру; ошибки — **тосты**; подложка на основной контент при открытой панели.
 
 ---
 
 ## Требования к окружению
 
-- **Node.js** (LTS) и npm  
-- **Rust** и зависимости [Tauri v2](https://v2.tauri.app/start/prerequisites/) для вашей ОС  
-- **.NET SDK** (совместимый с `Backend.API.csproj`) — для разработки и публикации API
+- **Node.js** (LTS), npm  
+- **Rust** и зависимости [Tauri v2](https://v2.tauri.app/start/prerequisites/)  
+- **.NET SDK** (совместимый с `Backend.API.csproj`)
 
 ---
 
 ## Локальная разработка
 
-### Вариант A: полное приложение (`tauri dev`)
+### Полное приложение (`tauri dev`)
 
-1. Соберите или опубликуйте исполняемый файл API (пример под Windows):
+1. Соберите backend (пример, Windows):
 
    ```bash
    dotnet publish ./src-dotnet/Backend.API/Backend.API.csproj -c Debug -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true -o ./artifacts/backend-win
    ```
 
-2. Укажите Tauri путь к этому файлу (перед `npm run tauri dev` в той же оболочке):
+2. Укажите путь к исполняемому файлу и запустите Tauri:
 
    ```bash
    set BACKEND_EXECUTABLE=C:\path\to\artifacts\backend-win\Backend.API.exe
@@ -56,95 +73,79 @@ Backend публикуется как **self-contained single-file** и укла
    npm run tauri dev
    ```
 
-   На Linux/macOS используйте `export BACKEND_EXECUTABLE=/absolute/path/to/Backend.API`.
+   Linux/macOS: `export BACKEND_EXECUTABLE=/absolute/path/to/Backend.API`.
 
-При старте оболочка поднимает свободный порт на `127.0.0.1`, передаёт его backend через переменную **`BACKEND_HTTP_BASE_URL`**, ждёт ответа **`GET /health`**, затем отдаёт базовый URL фронту через команду `get_backend_base_url`.
-
-### Вариант B: только веб-UI (без Tauri)
+### Только фронт (Vite)
 
 ```bash
 npm install
 npm run dev
 ```
 
-Страница откроется на порту Vite (см. консоль). Запросы к API без отдельно поднятого backend и без `invoke` работать не будут — удобно для вёрстки и быстрых правок UI.
+Без поднятого API и без `invoke` часть функций недоступна.
 
-### Backend отдельно (отладка API)
+### Только API
 
 ```bash
 dotnet run --project ./src-dotnet/Backend.API/Backend.API.csproj
 ```
 
-По умолчанию URL можно задать через `BACKEND_HTTP_BASE_URL` или аргументы `--urls` (см. `Program.cs`).
-
 ---
 
-## Сборка релиза (self-contained backend + Tauri)
-
-Используйте скрипт под целевую ОС хоста (или CI с соответствующим toolchain).
+## Сборка релиза
 
 ### Windows (`win-x64`)
-
-Удобно выполнять **на Windows** (или в CI с Windows + MSVC).
 
 ```bash
 npm install
 npm run build:win-x64
 ```
 
-Выполняется: `vite build` → `dotnet publish` в `src-tauri/binaries/backend/win-x64/Backend.API.exe` → `tauri build` с конфигом `src-tauri/tauri.bundle.windows.json`.
-
-**Артефакты:** `src-tauri/target/x86_64-pc-windows-msvc/release/bundle/`.
+Артефакты: `src-tauri/target/x86_64-pc-windows-msvc/release/bundle/`.
 
 ### Linux (`linux-x64`)
-
-Удобно выполнять **на Linux** с зависимостями Tauri/WebView для вашего дистрибутива.
 
 ```bash
 npm install
 npm run build:linux-x64
 ```
 
-**Артефакты:** `src-tauri/target/release/bundle/` (при сборке на хосте с дефолтным target).
+Артефакты: `src-tauri/target/release/bundle/` (на хосте с дефолтным target).
 
-### Полезные npm-скрипты
+### Скрипты npm
 
 | Скрипт | Описание |
 |--------|----------|
-| `npm run dev` | Только Vite (фронт) |
-| `npm run build:web` | `tsc` + production-сборка фронта в `dist/` |
-| `npm run build:backend:win-x64` / `build:backend:linux-x64` | Публикация только backend в `src-tauri/binaries/...` |
-| `npm run build:bundle:win-x64` / `build:bundle:linux-x64` | Фронт + backend под платформу |
-| `npm run tauri` | CLI Tauri (аргументы передаются после `--`) |
+| `npm run dev` | Vite |
+| `npm run build:web` | `tsc` + сборка в `dist/` |
+| `npm run build:backend:win-x64` / `build:backend:linux-x64` | Публикация backend в `src-tauri/binaries/...` |
+| `npm run build:bundle:*` | Фронт + backend под платформу |
+| `npm run tauri` | CLI Tauri |
 
-### Примечания по сборке
-
-- В `tauri.conf.json` перед сборкой Tauri вызывается **`npm run build:web`**; публикация .NET в bundle делается скриптами `build:bundle:*` / `build:win-x64` / `build:linux-x64`.
-- Кросс-компиляция Rust (например Windows `.exe` с Linux-хоста) требует отдельной настройки toolchain; для Windows-инсталлятора проще хост или CI под Windows.
+Перед `tauri build` вызывается `npm run build:web`; публикация .NET в ресурсы — через `build:bundle:*` или готовые `build:win-x64` / `build:linux-x64`.
 
 ---
 
-## Переменные окружения (оболочка / backend)
+## Переменные окружения
 
 | Переменная | Назначение |
 |------------|------------|
-| `BACKEND_EXECUTABLE` | Абсолютный путь к `Backend.API` при **разработке** (если нет встроенного bundle) |
-| `BACKEND_HTTP_BASE_URL` | Базовый HTTP URL, на котором должен слушать дочерний процесс (задаёт Tauri при spawn) |
-| `LOCAL_HTTP_BASE` | Альтернатива для разрешения URL в `Backend.API` (`Program.cs`) |
+| `BACKEND_EXECUTABLE` | Путь к `Backend.API` в разработке |
+| `BACKEND_HTTP_BASE_URL` | Базовый URL, который оболочка передаёт дочернему процессу |
+| `LOCAL_HTTP_BASE` | Альтернатива разрешения URL в `Backend.API` (`Program.cs`) |
 
 ---
 
 ## API (кратко)
 
-Помимо минимальных маршрутов `GET /health` и `GET /greet`, приложение использует контроллеры ASP.NET Core, в том числе:
+- `GET /health`, `GET /greet`
+- `GET/PUT /api/net/...` — сеть и discovery
+- `GET /api/Books` — демо-список
 
-- `GET/PUT /api/net/...` — роль, статус, конфигурация discovery, LAN-пиры, отключение;
-- `GET /api/Books` — тестовый список книг.
-
-В режиме Development доступен **Swagger**: `/swagger`.
+В Development: **Swagger** — `/swagger`.
 
 ---
 
-## Лицензия и продукт
+## Лицензия
 
-Проект помечен как `private` в `package.json`. При необходимости добавьте файл лицензии и обновите этот раздел.
+Репозиторий помечен как `private` в `package.json`. При публичном форке добавьте `LICENSE` и приведите идентификаторы приложения к своей организации.
