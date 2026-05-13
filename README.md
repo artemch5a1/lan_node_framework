@@ -143,9 +143,3 @@ npm run build:linux-x64
 - `GET /api/Books` — демо-список
 
 В Development: **Swagger** — `/swagger`.
-
----
-
-## Лицензия
-
-Репозиторий помечен как `private` в `package.json`. При публичном форке добавьте `LICENSE` и приведите идентификаторы приложения к своей организации.
