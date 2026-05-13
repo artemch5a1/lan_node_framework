@@ -1,12 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App";
-import { ToastProvider } from "./ToastProvider";
+import App from "./app/App";
+import { AppProviders } from "./app/AppProviders";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <ToastProvider>
+    <AppProviders>
       <App />
-    </ToastProvider>
+    </AppProviders>
   </React.StrictMode>,
 );
