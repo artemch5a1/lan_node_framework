@@ -67,12 +67,17 @@ export function AdminPanelView({
   onConfigurationFieldChange,
 }: AdminPanelViewProps) {
   return (
-    <div
-      className={`admin-panel ${open ? "admin-panel--open" : ""}`}
-      role="region"
-      aria-label="Админ панель"
-      aria-hidden={!open}
-    >
+    <>
+      <div
+        className={`admin-panel__backdrop ${open ? "admin-panel__backdrop--open" : ""}`}
+        aria-hidden={!open}
+      />
+      <div
+        className={`admin-panel ${open ? "admin-panel--open" : ""}`}
+        role="region"
+        aria-label="Админ панель"
+        aria-hidden={!open}
+      >
       <div className="admin-panel__scroll">
         <h2 className="admin-panel__title">админ панель</h2>
 
@@ -340,5 +345,6 @@ export function AdminPanelView({
         )}
       </div>
     </div>
+    </>
   );
 }

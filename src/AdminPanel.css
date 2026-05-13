@@ -1,3 +1,26 @@
+.admin-panel__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9990;
+  background: rgba(0, 0, 0, 0.42);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.28s ease-out, visibility 0.28s;
+  pointer-events: none;
+}
+
+.admin-panel__backdrop--open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+@media (prefers-color-scheme: light) {
+  .admin-panel__backdrop {
+    background: rgba(15, 15, 20, 0.38);
+  }
+}
+
 .admin-panel {
   position: fixed;
   top: 0;
@@ -12,6 +35,7 @@
   background: rgba(30, 30, 35, 0.97);
   color: #f0f0f0;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  border-bottom: 1px solid rgba(120, 165, 230, 0.42);
   transform: translateY(-100%);
   transition: transform 0.28s ease-out;
   pointer-events: none;
@@ -100,5 +124,6 @@
     background: rgba(245, 245, 248, 0.98);
     color: #1a1a1f;
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
+    border-bottom-color: rgba(70, 95, 150, 0.38);
   }
 }
