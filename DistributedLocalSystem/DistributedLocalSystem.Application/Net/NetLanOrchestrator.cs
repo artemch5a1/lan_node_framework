@@ -33,9 +33,12 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
                 NetRuntimeSnapshot.FromTransport(_net.GetStatus())
             );
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return Outcome<NetRuntimeSnapshot>.FromException(NetFlowErrorCodes.Unexpected, ex);
+            return Outcome<NetRuntimeSnapshot>.Fail(
+                NetFlowErrorCodes.Unexpected,
+                NetApiUserMessages.Unexpected
+            );
         }
     }
 
@@ -45,9 +48,9 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
         {
             return Outcome<string>.Ok(_net.GetStatus().ConfiguredRole);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return Outcome<string>.FromException(NetFlowErrorCodes.Unexpected, ex);
+            return Outcome<string>.Fail(NetFlowErrorCodes.Unexpected, NetApiUserMessages.Unexpected);
         }
     }
 
@@ -82,11 +85,11 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
                 "Операция отменена."
             );
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return Outcome<IReadOnlyList<LanNodeDescriptor>>.FromException(
+            return Outcome<IReadOnlyList<LanNodeDescriptor>>.Fail(
                 NetFlowErrorCodes.LanPeerScan,
-                ex
+                NetApiUserMessages.LanPeerScanFailed
             );
         }
     }
@@ -99,9 +102,12 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
                 NetConfigurationState.FromTransport(_net.GetCurrentConfiguration())
             );
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return Outcome<NetConfigurationState>.FromException(NetFlowErrorCodes.Unexpected, ex);
+            return Outcome<NetConfigurationState>.Fail(
+                NetFlowErrorCodes.Unexpected,
+                NetApiUserMessages.Unexpected
+            );
         }
     }
 
@@ -127,18 +133,18 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
         catch (InvalidOperationException ex)
         {
             if (IsAnotherHostPresent(ex.Message))
-            {
-                AnotherHostAlreadyPresentFault fault = new(ex.Message);
-                return Outcome<NetConfigurationState>.Fail(fault.ToFlowError());
-            }
+                return Outcome<NetConfigurationState>.Fail(new AnotherHostAlreadyPresentFault().ToFlowError());
 
-            return Outcome<NetConfigurationState>.Fail(NetFlowErrorCodes.HostCollision, ex.Message);
+            return Outcome<NetConfigurationState>.Fail(
+                NetFlowErrorCodes.HostCollision,
+                NetApiUserMessages.HostRoleConflict
+            );
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return Outcome<NetConfigurationState>.FromException(
+            return Outcome<NetConfigurationState>.Fail(
                 NetFlowErrorCodes.ConfigurationUpdate,
-                ex
+                NetApiUserMessages.ConfigurationSaveFailed
             );
         }
     }
@@ -168,18 +174,18 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
         catch (InvalidOperationException ex)
         {
             if (IsAnotherHostPresent(ex.Message))
-            {
-                AnotherHostAlreadyPresentFault fault = new(ex.Message);
-                return Outcome<NetConfigurationState>.Fail(fault.ToFlowError());
-            }
+                return Outcome<NetConfigurationState>.Fail(new AnotherHostAlreadyPresentFault().ToFlowError());
 
-            return Outcome<NetConfigurationState>.Fail(NetFlowErrorCodes.HostCollision, ex.Message);
+            return Outcome<NetConfigurationState>.Fail(
+                NetFlowErrorCodes.HostCollision,
+                NetApiUserMessages.HostRoleConflict
+            );
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return Outcome<NetConfigurationState>.FromException(
+            return Outcome<NetConfigurationState>.Fail(
                 NetFlowErrorCodes.ConfigurationReload,
-                ex
+                NetApiUserMessages.ConfigurationReloadAfterDisconnectFailed
             );
         }
     }

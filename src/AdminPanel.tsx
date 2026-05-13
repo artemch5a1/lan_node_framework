@@ -78,6 +78,48 @@ function roleLabel(role: NetConfiguredRole): string {
   }
 }
 
+type NetApiErrorBody = {
+  error?: { code?: string; message?: string };
+};
+
+/** Текст для пользователя из тела ответа API; без акцента на HTTP-код. */
+async function humanNetErrorMessage(response: Response): Promise<string> {
+  const raw = await response.text();
+  if (raw) {
+    try {
+      const json = JSON.parse(raw) as NetApiErrorBody;
+      const m = json.error?.message?.trim();
+      if (m) return m;
+    } catch {
+      /* не JSON */
+    }
+  }
+  return briefFallbackForStatus(response.status);
+}
+
+function userFacingErrorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+function briefFallbackForStatus(status: number): string {
+  switch (status) {
+    case 400:
+      return "Запрос отклонён: проверьте поля конфигурации.";
+    case 403:
+      return "Доступ запрещён.";
+    case 404:
+      return "Запрошенный ресурс не найден.";
+    case 409:
+      return "Операция конфликтует с текущим состоянием сети.";
+    case 502:
+    case 503:
+      return "Сервис временно недоступен. Попробуйте позже.";
+    case 500:
+    default:
+      return "Не удалось выполнить операцию. Обновите страницу или попробуйте снова.";
+  }
+}
+
 /** Ctrl+Shift+` (Backquote) — одна и та же комбинация открывает и закрывает. */
 function isAdminToggle(e: KeyboardEvent): boolean {
   return (
@@ -128,7 +170,7 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
   const fetchRole = useCallback(async () => {
     if (!baseUrl) return;
     const r = await fetch(`${baseUrl}/api/net/role`);
-    if (!r.ok) throw new Error(`role ${r.status}`);
+    if (!r.ok) throw new Error(await humanNetErrorMessage(r));
     const data = (await r.json()) as NetRoleResponse;
     setConfiguredRole(data.role);
   }, [baseUrl]);
@@ -136,21 +178,21 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
   const fetchStatus = useCallback(async () => {
     if (!baseUrl) return;
     const r = await fetch(`${baseUrl}/api/net/status`);
-    if (!r.ok) throw new Error(`status ${r.status}`);
+    if (!r.ok) throw new Error(await humanNetErrorMessage(r));
     setNet((await r.json()) as NetStatus);
   }, [baseUrl]);
 
   const fetchConfiguration = useCallback(async () => {
     if (!baseUrl) return;
     const r = await fetch(`${baseUrl}/api/net/configuration`);
-    if (!r.ok) throw new Error(`configuration ${r.status}`);
+    if (!r.ok) throw new Error(await humanNetErrorMessage(r));
     setConfiguration((await r.json()) as DiscoveryOptions);
   }, [baseUrl]);
 
   useEffect(() => {
     if (!baseUrl) return;
-    void fetchRole().catch((e) => setError(String(e)));
-    void fetchConfiguration().catch((e) => setError(String(e)));
+    void fetchRole().catch((e) => setError(userFacingErrorMessage(e)));
+    void fetchConfiguration().catch((e) => setError(userFacingErrorMessage(e)));
   }, [baseUrl, fetchRole, fetchConfiguration]);
 
   useEffect(() => {
@@ -167,7 +209,7 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
     try {
       await Promise.all([fetchRole(), fetchStatus()]);
     } catch (e) {
-      setError(String(e));
+      setError(userFacingErrorMessage(e));
     } finally {
       setRefreshing(false);
     }
@@ -179,11 +221,11 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
     setError(null);
     try {
       const response = await fetch(`${baseUrl}/api/net/lan-peers`);
-      if (!response.ok) throw new Error(`lan-peers ${response.status}`);
+      if (!response.ok) throw new Error(await humanNetErrorMessage(response));
       const data = (await response.json()) as LanPeerSnapshot[];
       setLanPeers(Array.isArray(data) ? data : []);
     } catch (e) {
-      setError(String(e));
+      setError(userFacingErrorMessage(e));
     } finally {
       setLanLoading(false);
     }
@@ -208,12 +250,12 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!response.ok) throw new Error(`configuration update ${response.status}`);
+      if (!response.ok) throw new Error(await humanNetErrorMessage(response));
       const updatedConfiguration = (await response.json()) as DiscoveryOptions;
       setConfiguration(updatedConfiguration);
       await Promise.all([fetchRole(), fetchStatus(), scanLanPeers()]);
     } catch (e) {
-      setError(String(e));
+      setError(userFacingErrorMessage(e));
     } finally {
       setSavingConfiguration(false);
     }
@@ -225,12 +267,12 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
     setError(null);
     try {
       const response = await fetch(`${baseUrl}/api/net/disconnect`, { method: "POST" });
-      if (!response.ok) throw new Error(`disconnect ${response.status}`);
+      if (!response.ok) throw new Error(await humanNetErrorMessage(response));
       const updatedConfiguration = (await response.json()) as DiscoveryOptions;
       setConfiguration(updatedConfiguration);
       await Promise.all([fetchRole(), fetchStatus(), scanLanPeers()]);
     } catch (e) {
-      setError(String(e));
+      setError(userFacingErrorMessage(e));
     } finally {
       setSavingConfiguration(false);
     }
@@ -249,13 +291,13 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
         body: JSON.stringify(configuration),
       });
 
-      if (!response.ok) throw new Error(`configuration update ${response.status}`);
+      if (!response.ok) throw new Error(await humanNetErrorMessage(response));
 
       const updatedConfiguration = (await response.json()) as DiscoveryOptions;
       setConfiguration(updatedConfiguration);
       await Promise.all([fetchRole(), fetchStatus()]);
     } catch (e) {
-      setError(String(e));
+      setError(userFacingErrorMessage(e));
     } finally {
       setSavingConfiguration(false);
     }

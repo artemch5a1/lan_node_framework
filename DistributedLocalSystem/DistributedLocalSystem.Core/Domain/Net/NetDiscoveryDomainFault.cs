@@ -9,10 +9,9 @@ public abstract record NetDiscoveryDomainFault(string Code, string Message)
 }
 
 /// <summary>В LAN уже есть другой хост с тем же идентификатором приложения.</summary>
-public sealed record AnotherHostAlreadyPresentFault(string Detail)
+public sealed record AnotherHostAlreadyPresentFault()
     : NetDiscoveryDomainFault(
         NetFlowErrorCodes.AnotherHostAlreadyPresent,
-        string.IsNullOrWhiteSpace(Detail)
-            ? "В сети уже обнаружен другой хост для этого приложения."
-            : Detail
+        "В этой сети уже запущен другой узел в режиме хоста с тем же приложением. "
+            + "Закройте лишний экземпляр или измените product / instance slug."
     );
