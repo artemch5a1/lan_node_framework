@@ -120,10 +120,7 @@ public sealed class NetDiscoverySettingsRepository : INetDiscoverySettingsReposi
             .CreateDbContextAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        await db.Database.EnsureCreatedAsync(cancellationToken).ConfigureAwait(false);
-        await NetDiscoverySqliteSchema
-            .ApplyPendingColumnAddsAsync(db, cancellationToken)
-            .ConfigureAwait(false);
+        await db.Database.MigrateAsync(cancellationToken).ConfigureAwait(false);
 
         NetDiscoverySettingsEntity? row = await db
             .NetDiscoverySettings.FirstOrDefaultAsync(
