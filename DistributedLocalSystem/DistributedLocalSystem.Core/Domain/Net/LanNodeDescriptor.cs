@@ -11,8 +11,7 @@ public sealed record LanNodeDescriptor(
     bool SeenInDiscovery
 )
 {
-    public string BeaconName =>
-        LanBeaconName.FormatFullNameOrDash(ProductSlug, InstanceSlug);
+    public string BeaconName => LanBeaconName.FormatFullNameOrDash(ProductSlug, InstanceSlug);
 
     public static LanNodeDescriptor FromTransport(LanPeerSnapshot s) =>
         new(s.IpAddress, s.ProductSlug, s.InstanceSlug, s.SeenInDiscovery);

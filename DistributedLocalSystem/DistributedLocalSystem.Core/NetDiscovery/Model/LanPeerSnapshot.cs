@@ -12,6 +12,5 @@ public sealed record LanPeerSnapshot(
 )
 {
     /// <summary>Полное имя в эфире; для «липкого» узла без валидной пары slug — «—».</summary>
-    public string BeaconName =>
-        LanBeaconName.FormatFullNameOrDash(ProductSlug, InstanceSlug);
+    public string BeaconName => LanBeaconName.FormatFullNameOrDash(ProductSlug, InstanceSlug);
 }

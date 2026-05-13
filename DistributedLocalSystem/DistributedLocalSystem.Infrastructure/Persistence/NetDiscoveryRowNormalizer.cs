@@ -36,7 +36,10 @@ internal static class NetDiscoveryRowNormalizer
 
         if (string.IsNullOrEmpty(e.ProductSlug) || string.IsNullOrEmpty(e.InstanceSlug))
         {
-            if (!string.IsNullOrEmpty(legacyAppId) && LanBeaconName.TryParse(legacyAppId, out LanBeaconParsed parsed))
+            if (
+                !string.IsNullOrEmpty(legacyAppId)
+                && LanBeaconName.TryParse(legacyAppId, out LanBeaconParsed parsed)
+            )
             {
                 if (string.IsNullOrEmpty(e.ProductSlug))
                     e.ProductSlug = parsed.ProductSlug;

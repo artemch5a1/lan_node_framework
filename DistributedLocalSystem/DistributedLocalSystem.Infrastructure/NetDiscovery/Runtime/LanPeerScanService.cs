@@ -41,13 +41,7 @@ public sealed class LanPeerScanService : ILanPeerScanService
             if (!string.Equals(parsed.ProductSlug, product, StringComparison.Ordinal))
                 return;
 
-            if (
-                string.Equals(
-                    server.Name,
-                    _identity.ExpectedServiceName,
-                    StringComparison.Ordinal
-                )
-            )
+            if (string.Equals(server.Name, _identity.ExpectedServiceName, StringComparison.Ordinal))
                 return;
 
             string ip = server.IpAddress.ToString();

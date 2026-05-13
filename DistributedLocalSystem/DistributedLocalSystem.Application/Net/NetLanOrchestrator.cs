@@ -50,7 +50,10 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
         }
         catch (Exception)
         {
-            return Outcome<string>.Fail(NetFlowErrorCodes.Unexpected, NetApiUserMessages.Unexpected);
+            return Outcome<string>.Fail(
+                NetFlowErrorCodes.Unexpected,
+                NetApiUserMessages.Unexpected
+            );
         }
     }
 
@@ -124,8 +127,7 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
 
         try
         {
-            DiscoveryOptions updated = await _net
-                .ChangeConfiguration(transport, cancellationToken)
+            DiscoveryOptions updated = await _net.ChangeConfiguration(transport, cancellationToken)
                 .ConfigureAwait(false);
             await _reloadCoordinator.ReloadAsync(cancellationToken).ConfigureAwait(false);
             return Outcome<NetConfigurationState>.Ok(NetConfigurationState.FromTransport(updated));
@@ -133,7 +135,9 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
         catch (InvalidOperationException ex)
         {
             if (IsAnotherHostPresent(ex.Message))
-                return Outcome<NetConfigurationState>.Fail(new AnotherHostAlreadyPresentFault().ToFlowError());
+                return Outcome<NetConfigurationState>.Fail(
+                    new AnotherHostAlreadyPresentFault().ToFlowError()
+                );
 
             return Outcome<NetConfigurationState>.Fail(
                 NetFlowErrorCodes.HostCollision,
@@ -165,8 +169,7 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
 
         try
         {
-            DiscoveryOptions updated = await _net
-                .ChangeConfiguration(next, cancellationToken)
+            DiscoveryOptions updated = await _net.ChangeConfiguration(next, cancellationToken)
                 .ConfigureAwait(false);
             await _reloadCoordinator.ReloadAsync(cancellationToken).ConfigureAwait(false);
             return Outcome<NetConfigurationState>.Ok(NetConfigurationState.FromTransport(updated));
@@ -174,7 +177,9 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
         catch (InvalidOperationException ex)
         {
             if (IsAnotherHostPresent(ex.Message))
-                return Outcome<NetConfigurationState>.Fail(new AnotherHostAlreadyPresentFault().ToFlowError());
+                return Outcome<NetConfigurationState>.Fail(
+                    new AnotherHostAlreadyPresentFault().ToFlowError()
+                );
 
             return Outcome<NetConfigurationState>.Fail(
                 NetFlowErrorCodes.HostCollision,
