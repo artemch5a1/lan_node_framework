@@ -1,3 +1,4 @@
+using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
 using DistributedLocalSystem.Core.NetDiscovery.Model;
 
 namespace DistributedLocalSystem.Core.Domain.Net;
@@ -5,7 +6,6 @@ namespace DistributedLocalSystem.Core.Domain.Net;
 /// <summary>Непрозрачная снимок конфигурации сети (без деталей хранения и discovery-стратегии).</summary>
 public sealed record NetConfigurationState(
     string Role,
-    string AppId,
     string ProductSlug,
     string InstanceSlug,
     string InstanceGuid,
@@ -17,10 +17,11 @@ public sealed record NetConfigurationState(
     int ProtocolVersion
 )
 {
+    public string AppId => LanBeaconName.FormatFullNameOrEmpty(ProductSlug, InstanceSlug);
+
     public static NetConfigurationState FromTransport(DiscoveryOptions o) =>
         new(
             o.Role,
-            o.AppId,
             o.ProductSlug,
             o.InstanceSlug,
             o.InstanceGuid,
@@ -37,7 +38,6 @@ public sealed record NetConfigurationState(
         DiscoveryOptions t = new()
         {
             Role = Role,
-            AppId = AppId,
             ProductSlug = ProductSlug,
             InstanceSlug = InstanceSlug,
             InstanceGuid = InstanceGuid,

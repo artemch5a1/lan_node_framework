@@ -63,7 +63,6 @@ public sealed class LanPeerScanService : ILanPeerScanService
                 string key = $"{ip}\u001f{server.Name}";
                 map[key] = new LanPeerSnapshot(
                     ip,
-                    server.Name,
                     parsed.ProductSlug,
                     parsed.InstanceSlug,
                     SeenInDiscovery: true
@@ -121,7 +120,6 @@ public sealed class LanPeerScanService : ILanPeerScanService
             0,
             new LanPeerSnapshot(
                 raw,
-                "—",
                 cur.ProductSlug.Trim(),
                 "(нет в эфире)",
                 SeenInDiscovery: false

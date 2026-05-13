@@ -1,3 +1,5 @@
+using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
+
 namespace DistributedLocalSystem.Core.NetDiscovery.Model;
 
 public sealed record NetStatusDto(
@@ -9,8 +11,11 @@ public sealed record NetStatusDto(
     string? RemoteHostBaseUrl,
     int LanPort,
     int UdpPort,
-    string AppId,
     string ProductSlug,
     string InstanceSlug,
     string InstanceGuid
-);
+)
+{
+    /// <summary>Полное beacon-имя; не хранится отдельно.</summary>
+    public string AppId => LanBeaconName.FormatFullNameOrEmpty(ProductSlug, InstanceSlug);
+}

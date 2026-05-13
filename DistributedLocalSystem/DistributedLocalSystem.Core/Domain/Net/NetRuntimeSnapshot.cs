@@ -1,3 +1,4 @@
+using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
 using DistributedLocalSystem.Core.NetDiscovery.Model;
 
 namespace DistributedLocalSystem.Core.Domain.Net;
@@ -12,12 +13,13 @@ public sealed record NetRuntimeSnapshot(
     string? RemoteHostBaseUrl,
     int LanPort,
     int UdpPort,
-    string AppId,
     string ProductSlug,
     string InstanceSlug,
     string InstanceGuid
 )
 {
+    public string AppId => LanBeaconName.FormatFullNameOrEmpty(ProductSlug, InstanceSlug);
+
     public static NetRuntimeSnapshot FromTransport(NetStatusDto d) =>
         new(
             d.ConfiguredRole,
@@ -28,7 +30,6 @@ public sealed record NetRuntimeSnapshot(
             d.RemoteHostBaseUrl,
             d.LanPort,
             d.UdpPort,
-            d.AppId,
             d.ProductSlug,
             d.InstanceSlug,
             d.InstanceGuid
@@ -44,7 +45,6 @@ public sealed record NetRuntimeSnapshot(
             RemoteHostBaseUrl,
             LanPort,
             UdpPort,
-            AppId,
             ProductSlug,
             InstanceSlug,
             InstanceGuid

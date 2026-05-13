@@ -57,6 +57,18 @@ public static partial class LanBeaconName
         return $"{FormatPrefix}-{productSlug}-{instanceSlug}";
     }
 
+    /// <summary>Полное имя beacon для валидной пары slug’ов; иначе пустая строка.</summary>
+    public static string FormatFullNameOrEmpty(string? productSlug, string? instanceSlug) =>
+        IsValidSlug(productSlug) && IsValidSlug(instanceSlug)
+            ? Build(productSlug!, instanceSlug!)
+            : string.Empty;
+
+    /// <summary>То же для отображения узла; при невалидной паре — «—».</summary>
+    public static string FormatFullNameOrDash(string? productSlug, string? instanceSlug) =>
+        IsValidSlug(productSlug) && IsValidSlug(instanceSlug)
+            ? Build(productSlug!, instanceSlug!)
+            : "—";
+
     /// <summary>
     /// Приводит произвольную строку к slug: нижний регистр, только буквы/цифры, обрезка по длине.
     /// Пустой результат заменяется на <paramref name="fallback"/>.

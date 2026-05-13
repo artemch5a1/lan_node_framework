@@ -137,7 +137,8 @@ public class DiscoveryAndModelTests
             new DiscoveryOptions
             {
                 Role = "client",
-                AppId = "demo-app",
+                ProductSlug = "demo",
+                InstanceSlug = "app",
                 LanPort = 17891,
                 UdpPort = 49152,
             }
@@ -147,9 +148,9 @@ public class DiscoveryAndModelTests
 
         Assert.Equal("client", status.ConfiguredRole);
         Assert.Equal(NetDiscoveryState.Idle, status.State);
-        Assert.Equal("demo-app", status.AppId);
-        Assert.Equal("", status.ProductSlug);
-        Assert.Equal("", status.InstanceSlug);
+        Assert.Equal("DLSv1-demo-app", status.AppId);
+        Assert.Equal("demo", status.ProductSlug);
+        Assert.Equal("app", status.InstanceSlug);
         Assert.Equal("", status.InstanceGuid);
         Assert.Equal(17891, status.LanPort);
         Assert.Equal(49152, status.UdpPort);

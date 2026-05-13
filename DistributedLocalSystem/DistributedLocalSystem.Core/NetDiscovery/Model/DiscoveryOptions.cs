@@ -10,8 +10,10 @@ public sealed class DiscoveryOptions
     /// <summary>Режим из хранилища: host | client (none устарел; при сохранении выводится из RemoteHostIp).</summary>
     public string Role { get; set; } = "host";
 
-    /// <summary>Полное имя в UDP beacon: <c>DLSv1-product-instance</c> (см. <see cref="LanBeaconName"/>).</summary>
-    public string AppId { get; set; } = "";
+    /// <summary>
+    /// Полное имя в UDP beacon: <c>DLSv1-product-instance</c> — вычисляется из <see cref="ProductSlug"/> и <see cref="InstanceSlug"/>.
+    /// </summary>
+    public string AppId => LanBeaconName.FormatFullNameOrEmpty(ProductSlug, InstanceSlug);
 
     /// <summary>Общий slug продукта для всех экземпляров линейки.</summary>
     public string ProductSlug { get; set; } = "";
@@ -45,7 +47,6 @@ public sealed class DiscoveryOptions
         new()
         {
             Role = Role,
-            AppId = AppId,
             ProductSlug = ProductSlug,
             InstanceSlug = InstanceSlug,
             InstanceGuid = InstanceGuid,

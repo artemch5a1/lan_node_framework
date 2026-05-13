@@ -1,5 +1,6 @@
+using System.Data;
 using DistributedLocalSystem.Core.Abstractions;
-using DistributedLocalSystem.Core.NetDiscovery.Identity;
+using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
 using DistributedLocalSystem.Core.NetDiscovery.Model;
 using DistributedLocalSystem.Infrastructure.Persistence;
 using DistributedLocalSystem.Infrastructure.Persistence.Entities;
@@ -33,7 +34,6 @@ public sealed class NetDiscoverySettingsRepository : INetDiscoverySettingsReposi
     )
     {
         DiscoveryOptions toPersist = NetDiscoverySettingsDefaults.Clone(newDiscoveryOptions);
-        NetDiscoverySettingsDefaults.SyncComputedAppId(toPersist);
         NetDiscoverySettingsDefaults.ApplyRoleFromRemoteHost(toPersist);
 
         await using DistributedLocalStorageContext db = await _factory
@@ -43,8 +43,7 @@ public sealed class NetDiscoverySettingsRepository : INetDiscoverySettingsReposi
         int count = await db
             .NetDiscoverySettings.ExecuteUpdateAsync(
                 x =>
-                    x.SetProperty(i => i.AppId, toPersist.AppId)
-                        .SetProperty(i => i.Role, toPersist.Role)
+                    x.SetProperty(i => i.Role, toPersist.Role)
                         .SetProperty(i => i.ProductSlug, toPersist.ProductSlug)
                         .SetProperty(i => i.InstanceSlug, toPersist.InstanceSlug)
                         .SetProperty(i => i.InstanceGuid, toPersist.InstanceGuid)
@@ -144,7 +143,9 @@ public sealed class NetDiscoverySettingsRepository : INetDiscoverySettingsReposi
         }
         else
         {
-            NetDiscoveryRowNormalizer.Normalize(row);
+            string? legacyAppId = await TryReadLegacyAppIdColumnAsync(db, cancellationToken)
+                .ConfigureAwait(false);
+            NetDiscoveryRowNormalizer.Normalize(row, legacyAppId);
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
 
@@ -160,11 +161,35 @@ public sealed class NetDiscoverySettingsRepository : INetDiscoverySettingsReposi
         {
             _log.LogInformation(
                 "SQLite: seeded net_discovery_settings (AppId={AppId}, Role={Role})",
-                row.AppId,
+                LanBeaconName.FormatFullNameOrEmpty(row.ProductSlug, row.InstanceSlug),
                 row.Role
             );
         }
 
         return NetDiscoverySettingsDefaults.Clone(mapped);
+    }
+
+    /// <summary>Старые БД хранят колонку AppId; читаем один раз для миграции slug’ов в нормализаторе.</summary>
+    private static async Task<string?> TryReadLegacyAppIdColumnAsync(
+        DistributedLocalStorageContext db,
+        CancellationToken cancellationToken
+    )
+    {
+        System.Data.Common.DbConnection conn = db.Database.GetDbConnection();
+        if (conn.State != ConnectionState.Open)
+            await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            await using System.Data.Common.DbCommand cmd = conn.CreateCommand();
+            cmd.CommandText =
+                $"SELECT AppId FROM net_discovery_settings WHERE Id = {NetDiscoverySettingsEntity.SingleRowId}";
+            object? scalar = await cmd.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+            return scalar as string;
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

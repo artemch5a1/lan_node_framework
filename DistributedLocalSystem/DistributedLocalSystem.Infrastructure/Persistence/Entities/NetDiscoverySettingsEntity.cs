@@ -15,9 +15,6 @@ public sealed class NetDiscoverySettingsEntity
     [MaxLength(32)]
     public string Role { get; set; } = "host";
 
-    [MaxLength(256)]
-    public string AppId { get; set; } = "";
-
     [MaxLength(48)]
     public string ProductSlug { get; set; } = "";
 

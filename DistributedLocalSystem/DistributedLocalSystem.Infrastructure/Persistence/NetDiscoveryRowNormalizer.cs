@@ -14,7 +14,10 @@ internal static class NetDiscoveryRowNormalizer
         return new string(buffer);
     }
 
-    internal static void Normalize(NetDiscoverySettingsEntity e)
+    /// <param name="legacyAppId">
+    /// Значение колонки AppId в старых БД (до вычисляемого beacon-имени); для новых таблиц без колонки — null.
+    /// </param>
+    internal static void Normalize(NetDiscoverySettingsEntity e, string? legacyAppId)
     {
         if (
             string.Equals(e.Role, "none", StringComparison.OrdinalIgnoreCase)
@@ -33,27 +36,20 @@ internal static class NetDiscoveryRowNormalizer
 
         if (string.IsNullOrEmpty(e.ProductSlug) || string.IsNullOrEmpty(e.InstanceSlug))
         {
-            if (LanBeaconName.TryParse(e.AppId, out LanBeaconParsed parsed))
+            if (!string.IsNullOrEmpty(legacyAppId) && LanBeaconName.TryParse(legacyAppId, out LanBeaconParsed parsed))
             {
                 if (string.IsNullOrEmpty(e.ProductSlug))
                     e.ProductSlug = parsed.ProductSlug;
                 if (string.IsNullOrEmpty(e.InstanceSlug))
                     e.InstanceSlug = parsed.InstanceSlug;
             }
-            else
+            else if (!string.IsNullOrEmpty(legacyAppId))
             {
                 if (string.IsNullOrEmpty(e.ProductSlug))
-                    e.ProductSlug = LanBeaconName.SlugifyLegacy(e.AppId);
+                    e.ProductSlug = LanBeaconName.SlugifyLegacy(legacyAppId);
                 if (string.IsNullOrEmpty(e.InstanceSlug))
                     e.InstanceSlug = NewRandomInstanceSlug();
             }
-        }
-
-        if (LanBeaconName.IsValidSlug(e.ProductSlug) && LanBeaconName.IsValidSlug(e.InstanceSlug))
-        {
-            string rebuilt = LanBeaconName.Build(e.ProductSlug, e.InstanceSlug);
-            if (!string.Equals(e.AppId, rebuilt, StringComparison.Ordinal))
-                e.AppId = rebuilt;
         }
     }
 }

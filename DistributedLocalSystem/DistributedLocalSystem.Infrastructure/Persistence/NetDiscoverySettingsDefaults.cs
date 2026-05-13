@@ -19,7 +19,6 @@ public static class NetDiscoverySettingsDefaults
             ProductSlug = productSlug,
             InstanceSlug = instanceSlug,
             InstanceGuid = Guid.NewGuid().ToString("N"),
-            AppId = LanBeaconName.Build(productSlug, instanceSlug),
             RemoteHostIp = null,
             UdpPort = 49000,
             LanPort = 17891,
@@ -27,13 +26,6 @@ public static class NetDiscoverySettingsDefaults
             DiscoveryTimeoutMs = 5000,
             ProtocolVersion = 1,
         };
-    }
-
-    /// <summary>Пересобирает <see cref="DiscoveryOptions.AppId"/> из slug’ов, если оба валидны.</summary>
-    public static void SyncComputedAppId(DiscoveryOptions o)
-    {
-        if (LanBeaconName.IsValidSlug(o.ProductSlug) && LanBeaconName.IsValidSlug(o.InstanceSlug))
-            o.AppId = LanBeaconName.Build(o.ProductSlug, o.InstanceSlug);
     }
 
     /// <summary>
@@ -58,7 +50,6 @@ public static class NetDiscoverySettingsDefaults
         new()
         {
             Role = e.Role,
-            AppId = e.AppId,
             ProductSlug = e.ProductSlug,
             InstanceSlug = e.InstanceSlug,
             InstanceGuid = e.InstanceGuid,

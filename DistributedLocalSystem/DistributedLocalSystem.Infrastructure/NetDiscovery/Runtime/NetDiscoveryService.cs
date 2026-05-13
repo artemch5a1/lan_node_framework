@@ -85,7 +85,6 @@ public sealed class NetDiscoveryService : INetDiscoveryRuntime
                 RemoteHostBaseUrl: BuildRemoteBaseUrl(),
                 LanPort: opt.LanPort,
                 UdpPort: opt.UdpPort,
-                AppId: opt.AppId,
                 ProductSlug: opt.ProductSlug,
                 InstanceSlug: opt.InstanceSlug,
                 InstanceGuid: opt.InstanceGuid
