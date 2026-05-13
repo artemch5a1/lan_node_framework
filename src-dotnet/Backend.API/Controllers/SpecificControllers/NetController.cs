@@ -137,6 +137,7 @@ public sealed class NetController : ControllerBase
             NetFlowErrorCodes.HostCollision => StatusCodes.Status409Conflict,
             NetFlowErrorCodes.AnotherHostAlreadyPresent => StatusCodes.Status409Conflict,
             NetFlowErrorCodes.OperationCancelled => StatusCodes.Status400BadRequest,
+            NetFlowErrorCodes.InvalidConfiguration => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError,
         };
 }

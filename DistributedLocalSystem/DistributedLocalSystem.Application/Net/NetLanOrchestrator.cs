@@ -55,6 +55,18 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
         CancellationToken cancellationToken
     )
     {
+        DiscoveryOptions cur = _net.GetCurrentConfiguration();
+        string product = cur.ProductSlug.Trim();
+        if (
+            !NetDiscoveryInputValidation.TryValidateLanPeerScanProduct(
+                product,
+                out NetFlowError? productError
+            )
+        )
+        {
+            return Outcome<IReadOnlyList<LanNodeDescriptor>>.Fail(productError!);
+        }
+
         try
         {
             IReadOnlyList<LanPeerSnapshot> raw = await _lanPeerScan
@@ -98,10 +110,16 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
         CancellationToken cancellationToken
     )
     {
+        DiscoveryOptions transport = next.ToTransport();
+        NetDiscoveryConfigurationNormalizer.ApplyRoleFromRemoteHost(transport);
+
+        if (!NetDiscoveryInputValidation.TryValidatePersist(transport, out NetFlowError? ve))
+            return Outcome<NetConfigurationState>.Fail(ve!);
+
         try
         {
-            DiscoveryOptions transport = next.ToTransport();
-            DiscoveryOptions updated = await _net.ChangeConfiguration(transport, cancellationToken)
+            DiscoveryOptions updated = await _net
+                .ChangeConfiguration(transport, cancellationToken)
                 .ConfigureAwait(false);
             await _reloadCoordinator.ReloadAsync(cancellationToken).ConfigureAwait(false);
             return Outcome<NetConfigurationState>.Ok(NetConfigurationState.FromTransport(updated));
@@ -129,14 +147,20 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
         CancellationToken cancellationToken
     )
     {
+        DiscoveryOptions current = _net.GetCurrentConfiguration();
+        DiscoveryOptions next = current.Clone();
+        next.RemoteHostIp = null;
+        next.Role = "host";
+
+        NetDiscoveryConfigurationNormalizer.ApplyRoleFromRemoteHost(next);
+
+        if (!NetDiscoveryInputValidation.TryValidatePersist(next, out NetFlowError? ve))
+            return Outcome<NetConfigurationState>.Fail(ve!);
+
         try
         {
-            DiscoveryOptions current = _net.GetCurrentConfiguration();
-            DiscoveryOptions next = current.Clone();
-            next.RemoteHostIp = null;
-            next.Role = "host";
-
-            DiscoveryOptions updated = await _net.ChangeConfiguration(next, cancellationToken)
+            DiscoveryOptions updated = await _net
+                .ChangeConfiguration(next, cancellationToken)
                 .ConfigureAwait(false);
             await _reloadCoordinator.ReloadAsync(cancellationToken).ConfigureAwait(false);
             return Outcome<NetConfigurationState>.Ok(NetConfigurationState.FromTransport(updated));

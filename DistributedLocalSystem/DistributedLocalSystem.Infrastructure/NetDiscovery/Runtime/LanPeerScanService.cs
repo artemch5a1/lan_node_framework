@@ -14,17 +14,14 @@ public sealed class LanPeerScanService : ILanPeerScanService
 {
     private readonly INetDiscoverySettingsRepository _settings;
     private readonly DiscoveryServiceIdentity _identity;
-    private readonly ILogger<LanPeerScanService> _log;
 
     public LanPeerScanService(
         INetDiscoverySettingsRepository settings,
-        DiscoveryServiceIdentity identity,
-        ILogger<LanPeerScanService> log
+        DiscoveryServiceIdentity identity
     )
     {
         _settings = settings;
         _identity = identity;
-        _log = log;
     }
 
     public async Task<IReadOnlyList<LanPeerSnapshot>> ScanAsync(
@@ -35,64 +32,57 @@ public sealed class LanPeerScanService : ILanPeerScanService
         List<LanPeerSnapshot> list = new();
 
         string product = opt.ProductSlug.Trim();
-        if (!LanBeaconName.IsValidSlug(product))
-        {
-            _log.LogWarning("LanPeerScan: ProductSlug is not a valid slug; skipping UDP scan.");
-        }
-        else
-        {
-            ConcurrentDictionary<string, LanPeerSnapshot> map = new(StringComparer.Ordinal);
+        ConcurrentDictionary<string, LanPeerSnapshot> map = new(StringComparer.Ordinal);
 
-            void OnDiscovered(DiscoveredServer server)
-            {
-                if (!LanBeaconName.TryParse(server.Name, out LanBeaconParsed parsed))
-                    return;
-                if (!string.Equals(parsed.ProductSlug, product, StringComparison.Ordinal))
-                    return;
+        void OnDiscovered(DiscoveredServer server)
+        {
+            if (!LanBeaconName.TryParse(server.Name, out LanBeaconParsed parsed))
+                return;
+            if (!string.Equals(parsed.ProductSlug, product, StringComparison.Ordinal))
+                return;
 
-                if (
-                    string.Equals(
-                        server.Name,
-                        _identity.ExpectedServiceName,
-                        StringComparison.Ordinal
-                    )
+            if (
+                string.Equals(
+                    server.Name,
+                    _identity.ExpectedServiceName,
+                    StringComparison.Ordinal
                 )
-                    return;
+            )
+                return;
 
-                string ip = server.IpAddress.ToString();
-                string key = $"{ip}\u001f{server.Name}";
-                map[key] = new LanPeerSnapshot(
-                    ip,
-                    parsed.ProductSlug,
-                    parsed.InstanceSlug,
-                    SeenInDiscovery: true
-                );
-            }
-
-            using var udp = new UdpDiscoveryService(
-                _settings,
-                _identity,
-                LanUdpPeerFilterKind.SameProductSlug
+            string ip = server.IpAddress.ToString();
+            string key = $"{ip}\u001f{server.Name}";
+            map[key] = new LanPeerSnapshot(
+                ip,
+                parsed.ProductSlug,
+                parsed.InstanceSlug,
+                SeenInDiscovery: true
             );
-            udp.ServerDiscovered += OnDiscovered;
-
-            await udp.StartAsync(cancellationToken).ConfigureAwait(false);
-
-            int ms = Math.Clamp(opt.DiscoveryTimeoutMs, 500, 10000);
-            try
-            {
-                await Task.Delay(ms, cancellationToken).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // normal when caller cancels
-            }
-
-            await udp.StopAsync(CancellationToken.None).ConfigureAwait(false);
-            udp.ServerDiscovered -= OnDiscovered;
-
-            list.AddRange(map.Values);
         }
+
+        using var udp = new UdpDiscoveryService(
+            _settings,
+            _identity,
+            LanUdpPeerFilterKind.SameProductSlug
+        );
+        udp.ServerDiscovered += OnDiscovered;
+
+        await udp.StartAsync(cancellationToken).ConfigureAwait(false);
+
+        int ms = Math.Clamp(opt.DiscoveryTimeoutMs, 500, 10000);
+        try
+        {
+            await Task.Delay(ms, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // normal when caller cancels
+        }
+
+        await udp.StopAsync(CancellationToken.None).ConfigureAwait(false);
+        udp.ServerDiscovered -= OnDiscovered;
+
+        list.AddRange(map.Values);
 
         PrependStickyRemoteIfNeeded(list, opt);
         return list;

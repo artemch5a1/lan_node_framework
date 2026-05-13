@@ -10,4 +10,7 @@ public static class NetFlowErrorCodes
     public const string LanPeerScan = "NET_LAN_PEER_SCAN";
     public const string OperationCancelled = "NET_OPERATION_CANCELLED";
     public const string AnotherHostAlreadyPresent = "NET_ANOTHER_HOST_PRESENT";
+
+    /// <summary>Некорректные поля конфигурации / slug для сценария.</summary>
+    public const string InvalidConfiguration = "NET_INVALID_CONFIGURATION";
 }

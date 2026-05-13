@@ -16,6 +16,7 @@
     <Using Include="Xunit" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\DistributedLocalSystem\DistributedLocalSystem.Application\DistributedLocalSystem.Application.csproj" />
     <ProjectReference Include="..\..\DistributedLocalSystem\DistributedLocalSystem.Core\DistributedLocalSystem.Core.csproj" />
     <ProjectReference Include="..\..\DistributedLocalSystem\DistributedLocalSystem.Infrastructure\DistributedLocalSystem.Infrastructure.csproj" />
   </ItemGroup>

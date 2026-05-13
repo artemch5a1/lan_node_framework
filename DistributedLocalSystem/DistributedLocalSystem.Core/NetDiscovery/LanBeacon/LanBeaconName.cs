@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 
 namespace DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
@@ -5,6 +6,7 @@ namespace DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
 /// <summary>
 /// Формат v1 имени в UDP beacon (одна строка без расширения библиотеки): <c>DLSv1-&lt;productSlug&gt;-&lt;instanceSlug&gt;</c>.
 /// Сегменты — только <c>[a-z0-9]</c>, до 48 символов каждый.
+/// Проверки допустимости значений для API — в слое Application.
 /// </summary>
 public static partial class LanBeaconName
 {
@@ -14,6 +16,7 @@ public static partial class LanBeaconName
     [GeneratedRegex("^[a-z0-9]{1,48}$", RegexOptions.Compiled)]
     private static partial Regex SlugPattern();
 
+    /// <summary>Синтаксис сегмента DLS (нижний регистр, буквы и цифры, длина).</summary>
     public static bool IsValidSlug(string? s) =>
         !string.IsNullOrEmpty(s) && SlugPattern().IsMatch(s);
 
@@ -47,27 +50,28 @@ public static partial class LanBeaconName
         return true;
     }
 
-    public static string Build(string productSlug, string instanceSlug)
+    /// <summary>Собирает полное имя beacon без исключений; неудача — пара slug не в синтаксисе DLS.</summary>
+    public static bool TryBuild(
+        string? productSlug,
+        string? instanceSlug,
+        [NotNullWhen(true)] out string? fullName
+    )
     {
-        if (!IsValidSlug(productSlug))
-            throw new ArgumentException("Invalid product slug.", nameof(productSlug));
-        if (!IsValidSlug(instanceSlug))
-            throw new ArgumentException("Invalid instance slug.", nameof(instanceSlug));
+        fullName = null;
+        if (!IsValidSlug(productSlug) || !IsValidSlug(instanceSlug))
+            return false;
 
-        return $"{FormatPrefix}-{productSlug}-{instanceSlug}";
+        fullName = $"{FormatPrefix}-{productSlug}-{instanceSlug}";
+        return true;
     }
 
-    /// <summary>Полное имя beacon для валидной пары slug’ов; иначе пустая строка.</summary>
+    /// <summary>Полное имя beacon для синтаксически допустимой пары slug’ов; иначе пустая строка.</summary>
     public static string FormatFullNameOrEmpty(string? productSlug, string? instanceSlug) =>
-        IsValidSlug(productSlug) && IsValidSlug(instanceSlug)
-            ? Build(productSlug!, instanceSlug!)
-            : string.Empty;
+        TryBuild(productSlug, instanceSlug, out string? full) ? full : string.Empty;
 
-    /// <summary>То же для отображения узла; при невалидной паре — «—».</summary>
+    /// <summary>То же для отображения узла; при недопустимой паре — «—».</summary>
     public static string FormatFullNameOrDash(string? productSlug, string? instanceSlug) =>
-        IsValidSlug(productSlug) && IsValidSlug(instanceSlug)
-            ? Build(productSlug!, instanceSlug!)
-            : "—";
+        TryBuild(productSlug, instanceSlug, out string? full) ? full : "—";
 
     /// <summary>
     /// Приводит произвольную строку к slug: нижний регистр, только буквы/цифры, обрезка по длине.

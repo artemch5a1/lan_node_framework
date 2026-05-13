@@ -5,13 +5,14 @@ namespace DistributedLocalSystem.Core.Tests;
 public class LanBeaconNameTests
 {
     [Fact]
-    public void Build_And_TryParse_Roundtrip()
+    public void TryBuild_And_TryParse_Roundtrip()
     {
-        string full = LanBeaconName.Build("myapp", "node01");
+        Assert.True(LanBeaconName.TryBuild("myapp", "node01", out string? full));
+        Assert.NotNull(full);
         Assert.True(LanBeaconName.TryParse(full, out LanBeaconParsed p));
         Assert.Equal("myapp", p.ProductSlug);
         Assert.Equal("node01", p.InstanceSlug);
-        Assert.Equal(full, p.FullName);
+        Assert.Equal(full!, p.FullName);
     }
 
     [Fact]
