@@ -6,7 +6,7 @@ using DistributedLocalSystem.Infrastructure.Attributes;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
-namespace Backend.API.Controllers;
+namespace Backend.API.Controllers.SpecificControllers;
 
 /// <summary>
 /// Тело ответа <c>GET /api/net/role</c> (имя свойства сериализуется в camelCase).
