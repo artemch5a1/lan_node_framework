@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useToast } from "./ToastProvider";
 import "./AdminPanel.css";
 
 type NetConfiguredRole = "none" | "host" | "client";
@@ -137,12 +138,12 @@ type AdminPanelProps = {
 };
 
 export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
+  const { notifyError } = useToast();
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminPanelTab>("current");
   const [configuredRole, setConfiguredRole] = useState<NetConfiguredRole | null>(null);
   const [net, setNet] = useState<NetStatus | null>(null);
   const [configuration, setConfiguration] = useState<DiscoveryOptions | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [savingConfiguration, setSavingConfiguration] = useState(false);
   const [lanPeers, setLanPeers] = useState<LanPeerSnapshot[]>([]);
@@ -191,9 +192,9 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
 
   useEffect(() => {
     if (!baseUrl) return;
-    void fetchRole().catch((e) => setError(userFacingErrorMessage(e)));
-    void fetchConfiguration().catch((e) => setError(userFacingErrorMessage(e)));
-  }, [baseUrl, fetchRole, fetchConfiguration]);
+    void fetchRole().catch((e) => notifyError(userFacingErrorMessage(e)));
+    void fetchConfiguration().catch((e) => notifyError(userFacingErrorMessage(e)));
+  }, [baseUrl, fetchRole, fetchConfiguration, notifyError]);
 
   useEffect(() => {
     if (!baseUrl) return;
@@ -205,11 +206,10 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
   async function refreshPageInfo() {
     if (!baseUrl) return;
     setRefreshing(true);
-    setError(null);
     try {
       await Promise.all([fetchRole(), fetchStatus()]);
     } catch (e) {
-      setError(userFacingErrorMessage(e));
+      notifyError(userFacingErrorMessage(e));
     } finally {
       setRefreshing(false);
     }
@@ -218,14 +218,13 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
   async function scanLanPeers() {
     if (!baseUrl) return;
     setLanLoading(true);
-    setError(null);
     try {
       const response = await fetch(`${baseUrl}/api/net/lan-peers`);
       if (!response.ok) throw new Error(await humanNetErrorMessage(response));
       const data = (await response.json()) as LanPeerSnapshot[];
       setLanPeers(Array.isArray(data) ? data : []);
     } catch (e) {
-      setError(userFacingErrorMessage(e));
+      notifyError(userFacingErrorMessage(e));
     } finally {
       setLanLoading(false);
     }
@@ -238,7 +237,6 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
   async function connectToLanPeer(ip: string) {
     if (!baseUrl || !configuration) return;
     setSavingConfiguration(true);
-    setError(null);
     try {
       const body: DiscoveryOptions = {
         ...configuration,
@@ -255,7 +253,7 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
       setConfiguration(updatedConfiguration);
       await Promise.all([fetchRole(), fetchStatus(), scanLanPeers()]);
     } catch (e) {
-      setError(userFacingErrorMessage(e));
+      notifyError(userFacingErrorMessage(e));
     } finally {
       setSavingConfiguration(false);
     }
@@ -264,7 +262,6 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
   async function disconnectFromRemoteHost() {
     if (!baseUrl) return;
     setSavingConfiguration(true);
-    setError(null);
     try {
       const response = await fetch(`${baseUrl}/api/net/disconnect`, { method: "POST" });
       if (!response.ok) throw new Error(await humanNetErrorMessage(response));
@@ -272,7 +269,7 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
       setConfiguration(updatedConfiguration);
       await Promise.all([fetchRole(), fetchStatus(), scanLanPeers()]);
     } catch (e) {
-      setError(userFacingErrorMessage(e));
+      notifyError(userFacingErrorMessage(e));
     } finally {
       setSavingConfiguration(false);
     }
@@ -281,7 +278,6 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
   async function saveConfiguration() {
     if (!baseUrl || !configuration) return;
     setSavingConfiguration(true);
-    setError(null);
     try {
       const response = await fetch(`${baseUrl}/api/net/configuration`, {
         method: "PUT",
@@ -297,7 +293,7 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
       setConfiguration(updatedConfiguration);
       await Promise.all([fetchRole(), fetchStatus()]);
     } catch (e) {
-      setError(userFacingErrorMessage(e));
+      notifyError(userFacingErrorMessage(e));
     } finally {
       setSavingConfiguration(false);
     }
@@ -320,9 +316,7 @@ export function AdminPanel({ baseUrl, backendLoadError }: AdminPanelProps) {
       <div className="admin-panel__scroll">
         <h2 className="admin-panel__title">админ панель</h2>
 
-        {backendLoadError && <p className="error">{backendLoadError}</p>}
         {!baseUrl && !backendLoadError && <p className="muted">Загрузка backend…</p>}
-        {error && <p className="error">{error}</p>}
 
         <section className="admin-panel__menu admin-panel__card">
           <button

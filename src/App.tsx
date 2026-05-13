@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { AdminPanel } from "./AdminPanel";
+import { useToast } from "./ToastProvider";
 import "./App.css";
 
 type Book = {
@@ -11,29 +12,32 @@ type Book = {
 };
 
 export default function App() {
+  const { notifyError } = useToast();
   const [baseUrl, setBaseUrl] = useState<string | null>(null);
   const [backendLoadError, setBackendLoadError] = useState<string | null>(null);
   const [books, setBooks] = useState<Book[] | null>(null);
   const [booksLoading, setBooksLoading] = useState(false);
-  const [booksError, setBooksError] = useState<string | null>(null);
 
   useEffect(() => {
-    void invoke<string>("get_backend_base_url").then(setBaseUrl).catch((e) => {
-      setBackendLoadError(String(e));
-    });
-  }, []);
+    void invoke<string>("get_backend_base_url")
+      .then(setBaseUrl)
+      .catch((e) => {
+        const msg = String(e);
+        setBackendLoadError(msg);
+        notifyError(msg);
+      });
+  }, [notifyError]);
 
   async function fetchBooks() {
     if (!baseUrl) return;
     setBooksLoading(true);
-    setBooksError(null);
     try {
       const r = await fetch(`${baseUrl}/api/Books`);
       if (!r.ok) throw new Error(`книги: HTTP ${r.status}`);
       const data = (await r.json()) as Book[];
       setBooks(data);
     } catch (e) {
-      setBooksError(String(e));
+      notifyError(String(e));
       setBooks(null);
     } finally {
       setBooksLoading(false);
@@ -47,7 +51,6 @@ export default function App() {
         <h1>Тест API</h1>
 
         {!baseUrl && !backendLoadError && <p className="muted">Загрузка backend…</p>}
-        {backendLoadError && <p className="error">{backendLoadError}</p>}
 
         <section className="card">
           <div className="row card-header-row">
@@ -61,8 +64,7 @@ export default function App() {
               {booksLoading ? "Загрузка…" : "Получить книги"}
             </button>
           </div>
-          {booksError && <p className="error">{booksError}</p>}
-          {books === null && !booksError && (
+          {books === null && (
             <p className="muted">
               Нажмите кнопку, чтобы запросить <code>GET /api/Books</code>.
             </p>
