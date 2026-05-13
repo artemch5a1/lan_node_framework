@@ -1,6 +1,5 @@
 using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.NetDiscovery.Model;
-using DistributedLocalSystem.Infrastructure.NetDiscovery.Runtime;
 
 namespace DistributedLocalSystem.Infrastructure.NetDiscovery.Configuration;
 
@@ -8,12 +7,12 @@ public sealed class NetDiscoveryConfigurationReloadCoordinator
     : INetDiscoveryConfigurationReloadCoordinator
 {
     private readonly INetDiscoverySettingsRepository _settings;
-    private readonly NetDiscoveryService _net;
+    private readonly INetDiscoveryRuntime _net;
     private readonly ILogger<NetDiscoveryConfigurationReloadCoordinator> _log;
 
     public NetDiscoveryConfigurationReloadCoordinator(
         INetDiscoverySettingsRepository settings,
-        NetDiscoveryService net,
+        INetDiscoveryRuntime net,
         ILogger<NetDiscoveryConfigurationReloadCoordinator> log
     )
     {

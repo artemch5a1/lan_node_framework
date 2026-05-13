@@ -39,6 +39,23 @@ public sealed class DiscoveryOptions
         };
 
     public NetConfiguredRole ParsedRole => ParseRole(Role);
+
+    /// <summary>Неглубокая копия полей для безопасной мутации без изменения исходного снимка.</summary>
+    public DiscoveryOptions Clone() =>
+        new()
+        {
+            Role = Role,
+            AppId = AppId,
+            ProductSlug = ProductSlug,
+            InstanceSlug = InstanceSlug,
+            InstanceGuid = InstanceGuid,
+            RemoteHostIp = RemoteHostIp,
+            UdpPort = UdpPort,
+            LanPort = LanPort,
+            BeaconIntervalMs = BeaconIntervalMs,
+            DiscoveryTimeoutMs = DiscoveryTimeoutMs,
+            ProtocolVersion = ProtocolVersion,
+        };
 }
 
 public enum NetConfiguredRole

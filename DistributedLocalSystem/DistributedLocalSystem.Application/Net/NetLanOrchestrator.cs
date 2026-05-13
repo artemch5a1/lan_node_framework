@@ -2,22 +2,20 @@ using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.Domain.Net;
 using DistributedLocalSystem.Core.Flow;
 using DistributedLocalSystem.Core.NetDiscovery.Model;
-using DistributedLocalSystem.Infrastructure.NetDiscovery.Runtime;
-using DistributedLocalSystem.Infrastructure.Persistence;
 
-namespace DistributedLocalSystem.Infrastructure.Application.Net;
+namespace DistributedLocalSystem.Application.Net;
 
 /// <summary>
-/// Адаптер «бог-объекта» <see cref="NetDiscoveryService"/> к <see cref="INetLanOrchestrator"/>; маппинг транспорт ↔ домен.
+/// Оркестрация LAN-сценариев над инфраструктурными контрактами (маппинг транспорт ↔ домен).
 /// </summary>
-public sealed class NetLanOrchestratorAdapter : INetLanOrchestrator
+public sealed class NetLanOrchestrator : INetLanOrchestrator
 {
-    private readonly NetDiscoveryService _net;
+    private readonly INetDiscoveryRuntime _net;
     private readonly ILanPeerScanService _lanPeerScan;
     private readonly INetDiscoveryConfigurationReloadCoordinator _reloadCoordinator;
 
-    public NetLanOrchestratorAdapter(
-        NetDiscoveryService net,
+    public NetLanOrchestrator(
+        INetDiscoveryRuntime net,
         ILanPeerScanService lanPeerScan,
         INetDiscoveryConfigurationReloadCoordinator reloadCoordinator
     )
@@ -134,7 +132,7 @@ public sealed class NetLanOrchestratorAdapter : INetLanOrchestrator
         try
         {
             DiscoveryOptions current = _net.GetCurrentConfiguration();
-            DiscoveryOptions next = NetDiscoverySettingsDefaults.Clone(current);
+            DiscoveryOptions next = current.Clone();
             next.RemoteHostIp = null;
             next.Role = "host";
 

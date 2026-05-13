@@ -70,19 +70,5 @@ public static class NetDiscoverySettingsDefaults
             ProtocolVersion = e.ProtocolVersion,
         };
 
-    public static DiscoveryOptions Clone(DiscoveryOptions o) =>
-        new()
-        {
-            Role = o.Role,
-            AppId = o.AppId,
-            ProductSlug = o.ProductSlug,
-            InstanceSlug = o.InstanceSlug,
-            InstanceGuid = o.InstanceGuid,
-            RemoteHostIp = o.RemoteHostIp,
-            UdpPort = o.UdpPort,
-            LanPort = o.LanPort,
-            BeaconIntervalMs = o.BeaconIntervalMs,
-            DiscoveryTimeoutMs = o.DiscoveryTimeoutMs,
-            ProtocolVersion = o.ProtocolVersion,
-        };
+    public static DiscoveryOptions Clone(DiscoveryOptions o) => o.Clone();
 }

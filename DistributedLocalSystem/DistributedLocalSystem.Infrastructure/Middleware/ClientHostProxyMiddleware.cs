@@ -1,6 +1,6 @@
 using System.Net.Http.Headers;
+using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Infrastructure.Attributes;
-using DistributedLocalSystem.Infrastructure.NetDiscovery.Runtime;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -57,7 +57,7 @@ public sealed class ClientHostProxyMiddleware(
 
     private readonly ClientHostProxyOptions _options = options.Value;
 
-    public async Task InvokeAsync(HttpContext context, NetDiscoveryService net)
+    public async Task InvokeAsync(HttpContext context, INetDiscoveryRuntime net)
     {
         if (ShouldSkipProxy(context))
         {
@@ -121,7 +121,7 @@ public sealed class ClientHostProxyMiddleware(
         return false;
     }
 
-    private static bool TryGetRemoteBaseUrl(NetDiscoveryService net, out string? remoteBase)
+    private static bool TryGetRemoteBaseUrl(INetDiscoveryRuntime net, out string? remoteBase)
     {
         return net.TryGetHostProxyBaseUrl(out remoteBase) && !string.IsNullOrEmpty(remoteBase);
     }
@@ -129,7 +129,7 @@ public sealed class ClientHostProxyMiddleware(
     private async Task ProxyRequestAsync(
         HttpContext context,
         string remoteBase,
-        NetDiscoveryService net
+        INetDiscoveryRuntime net
     )
     {
         try
@@ -259,7 +259,7 @@ public sealed class ClientHostProxyMiddleware(
     private async Task HandleTransportErrorAsync(
         HttpContext context,
         string remoteBase,
-        NetDiscoveryService net,
+        INetDiscoveryRuntime net,
         Exception exception
     )
     {

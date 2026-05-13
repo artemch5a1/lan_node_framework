@@ -10,7 +10,7 @@ using UdpDiscovery.Net;
 namespace DistributedLocalSystem.Infrastructure.NetDiscovery.Runtime;
 
 /// <summary>UDP discovery: хост — beacon, клиент — поиск хоста или <see cref="NetDiscoveryState.ClientLocalOnly"/>.</summary>
-public sealed class NetDiscoveryService : IDisposable
+public sealed class NetDiscoveryService : INetDiscoveryRuntime
 {
     private readonly INetDiscoverySettingsRepository _settings;
     private readonly DiscoveryServiceIdentity _localIdentity;

@@ -6,12 +6,12 @@ namespace DistributedLocalSystem.Infrastructure.NetDiscovery.Runtime;
 /// <summary>Старт/стоп discovery по <see cref="DiscoveryOptions.Role"/> из репозитория настроек.</summary>
 public sealed class NetDiscoveryHostedService : IHostedService
 {
-    private readonly NetDiscoveryService _net;
+    private readonly INetDiscoveryRuntime _net;
     private readonly INetDiscoverySettingsRepository _settings;
     private readonly ILogger<NetDiscoveryHostedService> _log;
 
     public NetDiscoveryHostedService(
-        NetDiscoveryService net,
+        INetDiscoveryRuntime net,
         INetDiscoverySettingsRepository settings,
         ILogger<NetDiscoveryHostedService> log
     )

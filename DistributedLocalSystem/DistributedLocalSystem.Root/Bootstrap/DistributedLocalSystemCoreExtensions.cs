@@ -1,10 +1,9 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using DistributedLocalSystem.Application;
+using DistributedLocalSystem.Application.Net;
 using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.NetDiscovery.Identity;
-using DistributedLocalSystem.Infrastructure.Application.Net;
 using DistributedLocalSystem.Infrastructure.Middleware;
 using DistributedLocalSystem.Infrastructure.NetDiscovery.Configuration;
 using DistributedLocalSystem.Infrastructure.NetDiscovery.Runtime;
@@ -44,13 +43,15 @@ public static class DistributedLocalSystemCoreExtensions
         );
 
         services.AddSingleton<NetDiscoveryService>();
+        services.AddSingleton<INetDiscoveryRuntime>(static sp =>
+            sp.GetRequiredService<NetDiscoveryService>()
+        );
         services.AddSingleton<ILanPeerScanService, LanPeerScanService>();
         services.AddSingleton<
             INetDiscoveryConfigurationReloadCoordinator,
             NetDiscoveryConfigurationReloadCoordinator
         >();
-        services.AddSingleton<INetLanOrchestrator, NetLanOrchestratorAdapter>();
-        services.AddDistributedLocalSystemNetUseCases();
+        services.AddSingleton<INetLanOrchestrator, NetLanOrchestrator>();
         services.AddHostedService<NetDiscoveryHostedService>();
 
         services
