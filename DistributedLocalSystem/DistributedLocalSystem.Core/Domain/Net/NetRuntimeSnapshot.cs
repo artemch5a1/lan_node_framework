@@ -15,7 +15,8 @@ public sealed record NetRuntimeSnapshot(
     int UdpPort,
     string ProductSlug,
     string InstanceSlug,
-    string InstanceGuid
+    string InstanceGuid,
+    IReadOnlyList<NetLocalIpv4Endpoint> LocalIpv4Endpoints
 )
 {
     public string AppId => LanBeaconName.FormatFullNameOrEmpty(ProductSlug, InstanceSlug);
@@ -32,7 +33,8 @@ public sealed record NetRuntimeSnapshot(
             d.UdpPort,
             d.ProductSlug,
             d.InstanceSlug,
-            d.InstanceGuid
+            d.InstanceGuid,
+            d.LocalIpv4Endpoints
         );
 
     public NetStatusDto ToTransport() =>
@@ -47,6 +49,7 @@ public sealed record NetRuntimeSnapshot(
             UdpPort,
             ProductSlug,
             InstanceSlug,
-            InstanceGuid
+            InstanceGuid,
+            LocalIpv4Endpoints
         );
 }

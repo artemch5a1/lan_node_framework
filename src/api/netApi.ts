@@ -21,7 +21,13 @@ export async function fetchNetRole(baseUrl: string): Promise<NetRoleResponse> {
 export async function fetchNetStatus(baseUrl: string): Promise<NetStatus> {
   const r = await fetch(`${baseUrl}/api/net/status`);
   await assertOk(r);
-  return (await r.json()) as NetStatus;
+  const raw = (await r.json()) as NetStatus;
+  return {
+    ...raw,
+    localIpv4Endpoints: Array.isArray(raw.localIpv4Endpoints)
+      ? raw.localIpv4Endpoints
+      : [],
+  };
 }
 
 export async function fetchNetConfiguration(baseUrl: string): Promise<DiscoveryOptions> {

@@ -11,6 +11,11 @@ export type NetRoleResponse = {
   role: NetConfiguredRole;
 };
 
+export type NetLocalIpv4Endpoint = {
+  address: string;
+  interfaceDescription: string;
+};
+
 export type NetStatus = {
   configuredRole: NetConfiguredRole;
   state: string;
@@ -24,6 +29,8 @@ export type NetStatus = {
   productSlug: string;
   instanceSlug: string;
   instanceGuid: string;
+  /** Локальные IPv4 с подписью адаптера (для выбора адреса в реальной LAN). */
+  localIpv4Endpoints: NetLocalIpv4Endpoint[];
 };
 
 export type DiscoveryOptions = {

@@ -324,12 +324,27 @@ export function AdminPanelView({
                 </button>
               </div>
               <p className="admin-panel__lede">{connectionSummary(net, configuredRole)}</p>
-              <p className="admin-panel__meta-line">
-                <span className="admin-panel__meta-label">Ваш адрес</span>
-                <span className="admin-panel__meta-value">
-                  {net?.thisHostIp?.trim() || "—"}
-                </span>
+              <p className="admin-panel__hint-soft admin-panel__hint-soft--below-lede">
+                Для подключения с другого ПК в обычной сети выберите адрес Wi‑Fi или Ethernet, а не
+                виртуального адаптера (VirtualBox, Hyper‑V и т.п.), если вы не в этой виртуальной сети.
               </p>
+              {net?.localIpv4Endpoints && net.localIpv4Endpoints.length > 0 ? (
+                <ul className="admin-panel__ip-list">
+                  {net.localIpv4Endpoints.map((e) => (
+                    <li key={e.address} className="admin-panel__ip-item">
+                      <span className="admin-panel__meta-value">{e.address}</span>
+                      <span className="admin-panel__hint-soft">{e.interfaceDescription}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="admin-panel__meta-line">
+                  <span className="admin-panel__meta-label">Ваш адрес</span>
+                  <span className="admin-panel__meta-value">
+                    {net?.thisHostIp?.trim() || "—"}
+                  </span>
+                </p>
+              )}
             </section>
 
             <section className="card admin-panel__card">
@@ -407,8 +422,23 @@ export function AdminPanelView({
                   <dd>{net.configuredRole}</dd>
                   <dt>Состояние</dt>
                   <dd>{net.state}</dd>
-                  <dt>IP</dt>
+                  <dt>IP (основной)</dt>
                   <dd>{net.thisHostIp ?? "—"}</dd>
+                  <dt>Локальные IPv4</dt>
+                  <dd>
+                    {net.localIpv4Endpoints?.length ? (
+                      <ul className="admin-panel__ip-list admin-panel__ip-list--inline">
+                        {net.localIpv4Endpoints.map((e) => (
+                          <li key={e.address} className="admin-panel__ip-item">
+                            <span className="admin-panel__meta-value">{e.address}</span>
+                            <span className="admin-panel__hint-soft">{e.interfaceDescription}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      "—"
+                    )}
+                  </dd>
                   <dt>Удалённый узел</dt>
                   <dd>{net.remoteHostBaseUrl ?? "—"}</dd>
                   <dt>Порты UDP / LAN</dt>

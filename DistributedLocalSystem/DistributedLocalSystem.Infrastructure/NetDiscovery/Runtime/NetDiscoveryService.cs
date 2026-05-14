@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.NetDiscovery.Identity;
@@ -87,7 +88,8 @@ public sealed class NetDiscoveryService : INetDiscoveryRuntime
                 UdpPort: opt.UdpPort,
                 ProductSlug: opt.ProductSlug,
                 InstanceSlug: opt.InstanceSlug,
-                InstanceGuid: opt.InstanceGuid
+                InstanceGuid: opt.InstanceGuid,
+                LocalIpv4Endpoints: EnumerateLocalIpv4Endpoints(_thisHostIp)
             );
         }
     }
@@ -404,6 +406,66 @@ public sealed class NetDiscoveryService : INetDiscoveryRuntime
         }
 
         return null;
+    }
+
+    /// <summary>Все пригодные для LAN IPv4 на поднятых адаптерах; <paramref name="primaryAddressFirst"/> — в начале списка.</summary>
+    private IReadOnlyList<NetLocalIpv4Endpoint> EnumerateLocalIpv4Endpoints(string? primaryAddressFirst)
+    {
+        try
+        {
+            List<NetLocalIpv4Endpoint> items = new();
+            HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+
+            foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (ni.OperationalStatus != OperationalStatus.Up)
+                    continue;
+
+                string label =
+                    !string.IsNullOrWhiteSpace(ni.Description)
+                        ? ni.Description.Trim()
+                        : !string.IsNullOrWhiteSpace(ni.Name)
+                            ? ni.Name.Trim()
+                            : "Сетевой адаптер";
+
+                foreach (UnicastIPAddressInformation u in ni.GetIPProperties().UnicastAddresses)
+                {
+                    if (!IsUsableLanIPv4(u.Address))
+                        continue;
+
+                    string addr = u.Address.ToString();
+                    if (!seen.Add(addr))
+                        continue;
+
+                    items.Add(new NetLocalIpv4Endpoint(addr, label));
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(primaryAddressFirst))
+            {
+                int idx = items.FindIndex(
+                    e =>
+                        string.Equals(
+                            e.Address,
+                            primaryAddressFirst,
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                );
+                if (idx > 0)
+                {
+                    NetLocalIpv4Endpoint pick = items[idx];
+                    items.RemoveAt(idx);
+                    items.Insert(0, pick);
+                }
+            }
+
+            return items;
+        }
+        catch (Exception ex)
+        {
+            _log.LogDebug(ex, "Net: could not enumerate local LAN IPv4 endpoints");
+            return Array.Empty<NetLocalIpv4Endpoint>();
+        }
     }
 
     private static bool IsUsableLanIPv4(IPAddress a) =>

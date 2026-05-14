@@ -177,6 +177,29 @@
   color: rgba(255, 255, 255, 0.55);
 }
 
+.admin-panel__hint-soft--below-lede {
+  margin-bottom: 0.5rem;
+}
+
+.admin-panel__ip-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.admin-panel__ip-list--inline {
+  margin-top: 0.25rem;
+}
+
+.admin-panel__ip-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
 .admin-panel__field--compact {
   gap: 0.4rem;
 }

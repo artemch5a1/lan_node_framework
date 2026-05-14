@@ -155,6 +155,7 @@ public class DiscoveryAndModelTests
         Assert.Equal(17891, status.LanPort);
         Assert.Equal(49152, status.UdpPort);
         Assert.Null(status.RemoteHostBaseUrl);
+        Assert.NotNull(status.LocalIpv4Endpoints);
     }
 
     [Fact]
