@@ -1,0 +1,120 @@
+using DistributedLocalSystem.Core.Abstractions;
+using DistributedLocalSystem.Core.NetDiscovery.Identity;
+using DistributedLocalSystem.Core.NetDiscovery.Model;
+using UdpDiscovery.Net;
+
+namespace DistributedLocalSystem.Infrastructure.Udp;
+
+public sealed class UdpDiscoveryService : IHostedService, IDisposable
+{
+    private readonly INetDiscoverySettingsRepository _settings;
+    private readonly DiscoveryServiceIdentity _localIdentity;
+    private readonly LanUdpPeerFilterKind _peerFilterKind;
+
+    public event Action<DiscoveredServer>? ServerDiscovered;
+    public event Action<DiscoveredServer>? ServerLost;
+
+    public string? LastDiscoveredServerIp { get; private set; } = string.Empty;
+
+    private readonly ServerDiscoveryService _serverDiscoveryService;
+
+    private CancellationTokenSource? _cancellationTokenSource;
+    private Task? _discoveryTask;
+
+    public UdpDiscoveryService(
+        INetDiscoverySettingsRepository settings,
+        DiscoveryServiceIdentity localIdentity,
+        LanUdpPeerFilterKind peerFilterKind
+    )
+    {
+        _settings = settings;
+        _localIdentity = localIdentity;
+        _peerFilterKind = peerFilterKind;
+        _serverDiscoveryService = new ServerDiscoveryService(
+            discoveryPort: (ushort)_settings.GetCurrent().UdpPort
+        );
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        if (_discoveryTask is { IsCompleted: false })
+        {
+            return Task.CompletedTask;
+        }
+
+        _cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken
+        );
+        _discoveryTask = RunDiscoveryAsync();
+        return Task.CompletedTask;
+    }
+
+    public async Task StopAsync(CancellationToken cancellationToken)
+    {
+        if (_cancellationTokenSource is not null)
+        {
+            _cancellationTokenSource.Cancel();
+
+            try
+            {
+                _serverDiscoveryService.ClearDiscoveredServers();
+            }
+            catch { }
+
+            if (_discoveryTask is not null)
+            {
+                await _discoveryTask.WaitAsync(cancellationToken);
+            }
+
+            _cancellationTokenSource.Dispose();
+            _cancellationTokenSource = null;
+        }
+    }
+
+    private async Task RunDiscoveryAsync()
+    {
+        _serverDiscoveryService.OnServerDiscovered += (server) =>
+        {
+            if (!MatchesPeer(server.Name))
+                return;
+
+            LastDiscoveredServerIp = server.IpAddress.ToString();
+            ServerDiscovered?.Invoke(server);
+        };
+
+        _serverDiscoveryService.OnServerDisappeared += (server) =>
+        {
+            if (!MatchesPeer(server.Name))
+                return;
+
+            ServerLost?.Invoke(server);
+        };
+
+        await _serverDiscoveryService.StartDiscovery();
+    }
+
+    private bool MatchesPeer(string? peerName) =>
+        _peerFilterKind switch
+        {
+            LanUdpPeerFilterKind.ExactBeaconName => _localIdentity.MatchesPeerExactBeacon(peerName),
+            LanUdpPeerFilterKind.SameProductSlug => _localIdentity.MatchesPeerSameProduct(peerName),
+            _ => false,
+        };
+
+    public void Dispose()
+    {
+        try
+        {
+            _serverDiscoveryService.ClearDiscoveredServers();
+        }
+        catch { }
+
+        try
+        {
+            _serverDiscoveryService.Dispose();
+        }
+        catch { }
+
+        _cancellationTokenSource?.Dispose();
+    }
+}

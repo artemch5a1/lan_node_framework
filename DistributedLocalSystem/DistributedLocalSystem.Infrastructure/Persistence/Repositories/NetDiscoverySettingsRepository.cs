@@ -1,0 +1,191 @@
+using System.Data;
+using DistributedLocalSystem.Core.Abstractions;
+using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
+using DistributedLocalSystem.Core.NetDiscovery.Model;
+using DistributedLocalSystem.Infrastructure.Persistence;
+using DistributedLocalSystem.Infrastructure.Persistence.Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+
+namespace DistributedLocalSystem.Infrastructure.Persistence.Repositories;
+
+public sealed class NetDiscoverySettingsRepository : INetDiscoverySettingsRepository
+{
+    private readonly IDbContextFactory<DistributedLocalStorageContext> _factory;
+    private readonly ILogger<NetDiscoverySettingsRepository> _log;
+    private readonly SemaphoreSlim _initGate = new(1, 1);
+    private readonly object _snapshotGate = new();
+
+    private DiscoveryOptions _snapshot = null!;
+    private bool _initialized;
+
+    public NetDiscoverySettingsRepository(
+        IDbContextFactory<DistributedLocalStorageContext> factory,
+        ILogger<NetDiscoverySettingsRepository> log
+    )
+    {
+        _factory = factory;
+        _log = log;
+    }
+
+    public async Task<DiscoveryOptions> UpdateConfiguration(
+        DiscoveryOptions newDiscoveryOptions,
+        CancellationToken cancellationToken = default
+    )
+    {
+        DiscoveryOptions toPersist = NetDiscoverySettingsDefaults.Clone(newDiscoveryOptions);
+
+        await using DistributedLocalStorageContext db = await _factory
+            .CreateDbContextAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        int count = await db
+            .NetDiscoverySettings.ExecuteUpdateAsync(
+                x =>
+                    x.SetProperty(i => i.Role, toPersist.Role)
+                        .SetProperty(i => i.ProductSlug, toPersist.ProductSlug)
+                        .SetProperty(i => i.InstanceSlug, toPersist.InstanceSlug)
+                        .SetProperty(i => i.InstanceGuid, toPersist.InstanceGuid)
+                        .SetProperty(i => i.RemoteHostIp, toPersist.RemoteHostIp)
+                        .SetProperty(i => i.BeaconIntervalMs, toPersist.BeaconIntervalMs)
+                        .SetProperty(i => i.DiscoveryTimeoutMs, toPersist.DiscoveryTimeoutMs)
+                        .SetProperty(i => i.LanPort, toPersist.LanPort)
+                        .SetProperty(i => i.ProtocolVersion, toPersist.ProtocolVersion)
+                        .SetProperty(i => i.UdpPort, toPersist.UdpPort),
+                cancellationToken: cancellationToken
+            )
+            .ConfigureAwait(false);
+
+        if (count < 1)
+            throw new Exception("Ошибка обновления данных");
+
+        return await LoadOrSeedAndPublishSnapshotAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task EnsureInitializedAsync(CancellationToken cancellationToken = default)
+    {
+        if (_initialized)
+            return;
+
+        await _initGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (_initialized)
+                return;
+
+            await LoadOrSeedAndPublishSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _initGate.Release();
+        }
+    }
+
+    public DiscoveryOptions GetCurrent()
+    {
+        if (!_initialized)
+        {
+            throw new InvalidOperationException(
+                "Net discovery settings are not loaded. Call EnsureInitializedAsync (or ReloadFromDatabaseAsync) first."
+            );
+        }
+
+        lock (_snapshotGate)
+        {
+            return NetDiscoverySettingsDefaults.Clone(_snapshot);
+        }
+    }
+
+    public async Task<DiscoveryOptions> ReloadFromDatabaseAsync(
+        CancellationToken cancellationToken = default
+    )
+    {
+        await _initGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await LoadOrSeedAndPublishSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _initGate.Release();
+        }
+    }
+
+    private async Task<DiscoveryOptions> LoadOrSeedAndPublishSnapshotAsync(
+        CancellationToken cancellationToken
+    )
+    {
+        await using DistributedLocalStorageContext db = await _factory
+            .CreateDbContextAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        await db.Database.MigrateAsync(cancellationToken).ConfigureAwait(false);
+
+        NetDiscoverySettingsEntity? row = await db
+            .NetDiscoverySettings.FirstOrDefaultAsync(
+                x => x.Id == NetDiscoverySettingsEntity.SingleRowId,
+                cancellationToken
+            )
+            .ConfigureAwait(false);
+
+        bool seeded = false;
+        if (row is null)
+        {
+            NetDiscoverySettingsEntity seed = NetDiscoverySettingsDefaults.CreateSeedEntity();
+            db.NetDiscoverySettings.Add(seed);
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            row = seed;
+            seeded = true;
+        }
+        else
+        {
+            string? legacyAppId = await TryReadLegacyAppIdColumnAsync(db, cancellationToken)
+                .ConfigureAwait(false);
+            NetDiscoveryRowNormalizer.Normalize(row, legacyAppId);
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        DiscoveryOptions mapped = NetDiscoverySettingsDefaults.ToDiscoveryOptions(row);
+
+        lock (_snapshotGate)
+        {
+            _snapshot = NetDiscoverySettingsDefaults.Clone(mapped);
+            _initialized = true;
+        }
+
+        if (seeded)
+        {
+            _log.LogInformation(
+                "SQLite: seeded net_discovery_settings (AppId={AppId}, Role={Role})",
+                LanBeaconName.FormatFullNameOrEmpty(row.ProductSlug, row.InstanceSlug),
+                row.Role
+            );
+        }
+
+        return NetDiscoverySettingsDefaults.Clone(mapped);
+    }
+
+    /// <summary>Старые БД хранят колонку AppId; читаем один раз для миграции slug’ов в нормализаторе.</summary>
+    private static async Task<string?> TryReadLegacyAppIdColumnAsync(
+        DistributedLocalStorageContext db,
+        CancellationToken cancellationToken
+    )
+    {
+        System.Data.Common.DbConnection conn = db.Database.GetDbConnection();
+        if (conn.State != ConnectionState.Open)
+            await conn.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            await using System.Data.Common.DbCommand cmd = conn.CreateCommand();
+            cmd.CommandText =
+                $"SELECT AppId FROM net_discovery_settings WHERE Id = {NetDiscoverySettingsEntity.SingleRowId}";
+            object? scalar = await cmd.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false);
+            return scalar as string;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+}

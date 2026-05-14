@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    op_1_26_non_standard_situations_lib::run()
+    lan_node_framework_lib::run()
 }

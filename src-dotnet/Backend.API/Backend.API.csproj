@@ -5,10 +5,18 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\DistributedLocalSystem\DistributedLocalSystem.Core.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Backend.Infrastructure\Backend.Infrastructure.csproj" />
     <ProjectReference Include="..\Backend.Application\Backend.Application.csproj" />
     <ProjectReference Include="..\Backend.Domain\Backend.Domain.csproj" />
+    <ProjectReference Include="..\..\DistributedLocalSystem\DistributedLocalSystem.Core\DistributedLocalSystem.Core.csproj" />
+    <ProjectReference Include="..\..\DistributedLocalSystem\DistributedLocalSystem.Root\DistributedLocalSystem.Root.csproj" />
   </ItemGroup>
-  <!-- Вынесенная логика host/client находится в DistributedLocalSystem.Core -->
+  <!-- DistributedLocalSystem: Core + Root (композиция) -->
 </Project>

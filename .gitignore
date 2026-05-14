@@ -27,6 +27,9 @@ src-tauri/target/
 **/bin/
 **/obj/
 
+# EF design-time SQLite (dotnet ef migrations)
+**/ef-design-distributed-local.db
+
 # Local SQLite (DistributedLocalSystem)
 **/distributed-local.db
 **/distributed-local.db-shm
