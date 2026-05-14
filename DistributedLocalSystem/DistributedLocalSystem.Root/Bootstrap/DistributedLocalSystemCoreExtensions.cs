@@ -66,6 +66,18 @@ public static class DistributedLocalSystemCoreExtensions
                 }
             );
 
+        services
+            .AddHttpClient("NetRemoteProbe")
+            .ConfigureHttpClient(static c => c.Timeout = TimeSpan.FromSeconds(8))
+            .ConfigurePrimaryHttpMessageHandler(static () =>
+                new SocketsHttpHandler
+                {
+                    AllowAutoRedirect = false,
+                    UseCookies = false,
+                    AutomaticDecompression = DecompressionMethods.None,
+                }
+            );
+
         services.ConfigureHttpJsonOptions(o =>
         {
             o.SerializerOptions.Converters.Add(

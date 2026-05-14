@@ -1,4 +1,10 @@
-import type { DiscoveryOptions, LanPeerSnapshot, NetRoleResponse, NetStatus } from "./types";
+import type {
+  ConnectByIpResult,
+  DiscoveryOptions,
+  LanPeerSnapshot,
+  NetRoleResponse,
+  NetStatus,
+} from "./types";
 import { parseNetErrorResponse } from "../services/notificationFormatting";
 
 async function assertOk(response: Response): Promise<void> {
@@ -48,4 +54,17 @@ export async function postNetDisconnect(baseUrl: string): Promise<DiscoveryOptio
   const r = await fetch(`${baseUrl}/api/net/disconnect`, { method: "POST" });
   await assertOk(r);
   return (await r.json()) as DiscoveryOptions;
+}
+
+export async function postConnectByIp(
+  baseUrl: string,
+  ipAddress: string,
+): Promise<ConnectByIpResult> {
+  const r = await fetch(`${baseUrl}/api/net/connect-by-ip`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ipAddress }),
+  });
+  await assertOk(r);
+  return (await r.json()) as ConnectByIpResult;
 }

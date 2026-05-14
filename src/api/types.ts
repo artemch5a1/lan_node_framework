@@ -48,3 +48,8 @@ export type LanPeerSnapshot = {
   /** false — сохранённое подключение, в эфире сейчас не видно */
   seenInDiscovery?: boolean;
 };
+
+export type ConnectByIpResult = {
+  configuration: DiscoveryOptions;
+  peer: LanPeerSnapshot;
+};

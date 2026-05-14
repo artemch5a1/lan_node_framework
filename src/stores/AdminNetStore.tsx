@@ -14,6 +14,7 @@ import {
   fetchNetConfiguration,
   fetchNetRole,
   fetchNetStatus,
+  postConnectByIp,
   postNetDisconnect,
   putNetConfiguration,
 } from "../api/netApi";
@@ -43,6 +44,7 @@ type AdminNetStoreValue = {
   isConnectedToLanPeer: (ip: string) => boolean;
   connectToLanPeer: (ip: string) => Promise<void>;
   disconnectFromRemoteHost: () => Promise<void>;
+  connectByManualIp: (ip: string) => Promise<boolean>;
   saveConfiguration: () => Promise<void>;
   updateConfigurationField: <K extends keyof DiscoveryOptions>(
     key: K,
@@ -65,10 +67,11 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
   const [savingConfiguration, setSavingConfiguration] = useState(false);
   const [lanPeers, setLanPeers] = useState<LanPeerSnapshot[]>([]);
   const [lanLoading, setLanLoading] = useState(false);
+  const [manualLanOverlay, setManualLanOverlay] = useState<LanPeerSnapshot | null>(null);
 
   const lanPeersDisplay = useMemo(
-    () => mergeLanPeersWithStickyConnection(lanPeers, net),
-    [lanPeers, net],
+    () => mergeLanPeersWithStickyConnection(lanPeers, net, manualLanOverlay),
+    [lanPeers, net, manualLanOverlay],
   );
 
   const loadRole = useCallback(async () => {
@@ -130,7 +133,9 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
   }, [baseUrl, notifications]);
 
   const isConnectedToLanPeer = useCallback(
-    (ip: string) => net?.configuredRole === "client" && net?.remoteHostIp === ip,
+    (ip: string) =>
+      net?.configuredRole === "client" &&
+      (net?.remoteHostIp?.trim() ?? "") === (ip?.trim() ?? ""),
     [net],
   );
 
@@ -146,6 +151,7 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
         };
         const updated = await putNetConfiguration(baseUrl, body);
         setConfiguration(updated);
+        setManualLanOverlay(null);
         await Promise.all([loadRole(), loadStatus(), scanLanPeers()]);
       } catch (e) {
         notifications.showErrorFromUnknown(e);
@@ -162,6 +168,7 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
     try {
       const updated = await postNetDisconnect(baseUrl);
       setConfiguration(updated);
+      setManualLanOverlay(null);
       await Promise.all([loadRole(), loadStatus(), scanLanPeers()]);
     } catch (e) {
       notifications.showErrorFromUnknown(e);
@@ -191,6 +198,31 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const connectByManualIp = useCallback(async (ip: string): Promise<boolean> => {
+    if (!baseUrl) return false;
+    const trimmed = ip.trim();
+    if (!trimmed) return false;
+    setSavingConfiguration(true);
+    try {
+      const result = await postConnectByIp(baseUrl, trimmed);
+      setConfiguration(result.configuration);
+      setManualLanOverlay({
+        ...result.peer,
+        beaconName: result.peer.beaconName || "—",
+        productSlug: result.peer.productSlug ?? "",
+        instanceSlug: result.peer.instanceSlug ?? "",
+        seenInDiscovery: result.peer.seenInDiscovery ?? false,
+      });
+      await Promise.all([loadRole(), loadStatus(), scanLanPeers()]);
+      return true;
+    } catch (e) {
+      notifications.showErrorFromUnknown(e);
+      return false;
+    } finally {
+      setSavingConfiguration(false);
+    }
+  }, [baseUrl, loadRole, loadStatus, scanLanPeers, notifications]);
+
   const value: AdminNetStoreValue = useMemo(
     () => ({
       baseUrl,
@@ -211,6 +243,7 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
       isConnectedToLanPeer,
       connectToLanPeer,
       disconnectFromRemoteHost,
+      connectByManualIp,
       saveConfiguration,
       updateConfigurationField,
     }),
@@ -231,6 +264,7 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
       isConnectedToLanPeer,
       connectToLanPeer,
       disconnectFromRemoteHost,
+      connectByManualIp,
       saveConfiguration,
       updateConfigurationField,
     ],
