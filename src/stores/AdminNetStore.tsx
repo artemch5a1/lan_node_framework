@@ -202,6 +202,7 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
     if (!baseUrl) return false;
     const trimmed = ip.trim();
     if (!trimmed) return false;
+    setManualLanOverlay(null);
     setSavingConfiguration(true);
     try {
       const result = await postConnectByIp(baseUrl, trimmed);
@@ -216,12 +217,18 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
       await Promise.all([loadRole(), loadStatus(), scanLanPeers()]);
       return true;
     } catch (e) {
+      setManualLanOverlay(null);
       notifications.showErrorFromUnknown(e);
+      try {
+        await Promise.all([loadConfiguration(), loadRole(), loadStatus(), scanLanPeers()]);
+      } catch {
+        /* ignore resync errors */
+      }
       return false;
     } finally {
       setSavingConfiguration(false);
     }
-  }, [baseUrl, loadRole, loadStatus, scanLanPeers, notifications]);
+  }, [baseUrl, loadConfiguration, loadRole, loadStatus, scanLanPeers, notifications]);
 
   const value: AdminNetStoreValue = useMemo(
     () => ({

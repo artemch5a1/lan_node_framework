@@ -74,6 +74,7 @@ public static class DistributedLocalSystemCoreExtensions
                 {
                     AllowAutoRedirect = false,
                     UseCookies = false,
+                    UseProxy = false,
                     AutomaticDecompression = DecompressionMethods.None,
                 }
             );

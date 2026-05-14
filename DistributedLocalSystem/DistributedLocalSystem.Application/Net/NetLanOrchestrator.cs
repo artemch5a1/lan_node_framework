@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Text.Json;
 using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.Domain.Net;
@@ -193,16 +195,11 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
 
         NetRuntimeSnapshot snap = snapOutcome.Value;
         string canonicalIp = parsedAddr.ToString();
-        if (
-            !string.IsNullOrWhiteSpace(snap.ThisHostIp)
-            && IPAddress.TryParse(snap.ThisHostIp.Trim(), out IPAddress? selfAddr)
-            && selfAddr is not null
-            && selfAddr.Equals(parsedAddr)
-        )
+        if (IsConnectByIpTargetLocalMachine(parsedAddr, snap))
         {
             return Outcome<ConnectByIpResult>.Fail(
                 NetFlowErrorCodes.InvalidConfiguration,
-                "Нельзя подключиться к собственному IP этого компьютера."
+                "Нельзя подключиться к адресу этого компьютера. Укажите IP другого узла в сети."
             );
         }
 
@@ -286,6 +283,27 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
             );
         }
 
+        string localGuid = current.InstanceGuid?.Trim() ?? "";
+        string remoteGuid = remoteCfg.InstanceGuid?.Trim() ?? "";
+        if (string.IsNullOrEmpty(remoteGuid))
+        {
+            return Outcome<ConnectByIpResult>.Fail(
+                NetFlowErrorCodes.RemoteHostUnreachable,
+                "Ответ узла не содержит InstanceGuid — похоже, это не API этой программы."
+            );
+        }
+
+        if (
+            localGuid.Length > 0
+            && string.Equals(localGuid, remoteGuid, StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            return Outcome<ConnectByIpResult>.Fail(
+                NetFlowErrorCodes.InvalidConfiguration,
+                "Ответ с указанного адреса относится к этому же экземпляру (совпадает InstanceGuid). Укажите другой компьютер."
+            );
+        }
+
         DiscoveryOptions next = current.Clone();
         next.RemoteHostIp = canonicalIp;
         NetDiscoveryConfigurationNormalizer.ApplyRoleFromRemoteHost(next);
@@ -357,6 +375,65 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
                 NetFlowErrorCodes.ConfigurationReload,
                 NetApiUserMessages.ConfigurationReloadAfterDisconnectFailed
             );
+        }
+    }
+
+    private static bool IsConnectByIpTargetLocalMachine(IPAddress target, NetRuntimeSnapshot snap)
+    {
+        if (IPAddress.IsLoopback(target))
+            return true;
+
+        if (!string.IsNullOrWhiteSpace(snap.ThisHostIp))
+        {
+            if (
+                IPAddress.TryParse(snap.ThisHostIp.Trim(), out IPAddress? reported)
+                && reported is not null
+                && IpAddressesEqualNormalized(target, reported)
+            )
+                return true;
+        }
+
+        foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
+        {
+            if (ni.OperationalStatus != OperationalStatus.Up)
+                continue;
+
+            foreach (UnicastIPAddressInformation u in ni.GetIPProperties().UnicastAddresses)
+            {
+                if (
+                    u.Address.AddressFamily
+                    is not (AddressFamily.InterNetwork or AddressFamily.InterNetworkV6)
+                )
+                    continue;
+
+                if (IpAddressesEqualNormalized(target, u.Address))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IpAddressesEqualNormalized(IPAddress a, IPAddress b)
+    {
+        if (a.Equals(b))
+            return true;
+
+        try
+        {
+            IPAddress na =
+                a.AddressFamily == AddressFamily.InterNetworkV6 && a.IsIPv4MappedToIPv6
+                    ? a.MapToIPv4()
+                    : a;
+            IPAddress nb =
+                b.AddressFamily == AddressFamily.InterNetworkV6 && b.IsIPv4MappedToIPv6
+                    ? b.MapToIPv4()
+                    : b;
+            return na.Equals(nb);
+        }
+        catch
+        {
+            return false;
         }
     }
 
