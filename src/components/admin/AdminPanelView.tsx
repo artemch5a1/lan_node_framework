@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type {
   DiscoveryOptions,
   LanPeerSnapshot,
@@ -18,11 +19,118 @@ function roleLabel(role: NetConfiguredRole): string {
   }
 }
 
+function connectionSummary(
+  net: NetStatus | null,
+  configuredRole: NetConfiguredRole | null,
+): string {
+  const role = configuredRole ?? net?.configuredRole ?? "none";
+  if (role === "client") {
+    const ip = net?.remoteHostIp?.trim();
+    const url = net?.remoteHostBaseUrl?.trim();
+    if (ip) return `Подключены к компьютеру ${ip}`;
+    if (url) return `Подключены по адресу ${url}`;
+    return "Подключение к другому компьютеру";
+  }
+  return "Локальная работа";
+}
+
+function LanPeersSimpleList({
+  peers,
+  lanLoading,
+  baseUrl,
+  configuration,
+  savingConfiguration,
+  onScanLanPeers,
+  onConnect,
+  onDisconnect,
+  isConnectedToLanPeer,
+}: {
+  peers: LanPeerSnapshot[];
+  lanLoading: boolean;
+  baseUrl: string | null;
+  configuration: DiscoveryOptions | null;
+  savingConfiguration: boolean;
+  onScanLanPeers: () => void;
+  onConnect: (ip: string) => void;
+  onDisconnect: () => void;
+  isConnectedToLanPeer: (ip: string) => boolean;
+}) {
+  function titleFor(p: LanPeerSnapshot): string {
+    const slug = (p.instanceSlug ?? "").trim();
+    return slug.length > 0 ? slug : "Компьютер в сети";
+  }
+
+  return (
+    <>
+      <div className="row card-header-row">
+        <h2 className="admin-panel__section-title">Серверы рядом</h2>
+        <button
+          type="button"
+          className="btn-refresh"
+          disabled={!baseUrl || lanLoading}
+          onClick={() => void onScanLanPeers()}
+        >
+          {lanLoading ? "Поиск…" : "Обновить список"}
+        </button>
+      </div>
+      <p className="admin-panel__hint-soft">
+        Узлы с этой же программой в вашей локальной сети.
+      </p>
+      {lanLoading && peers.length === 0 ? (
+        <p className="muted">Ищем компьютеры…</p>
+      ) : peers.length === 0 ? (
+        <p className="muted">Пока никого нет. Обновите список или проверьте Wi‑Fi.</p>
+      ) : (
+        <ul className="admin-panel__peer-list">
+          {peers.map((p) => {
+            const connected = isConnectedToLanPeer(p.ipAddress);
+            const offline = p.seenInDiscovery === false;
+            return (
+              <li
+                key={
+                  offline ? `${p.ipAddress}__sticky` : `${p.ipAddress}-${p.beaconName}`
+                }
+                className={`admin-panel__peer-item${connected ? " admin-panel__peer-item--active" : ""}`}
+              >
+                <div className="admin-panel__peer-main">
+                  <span className="admin-panel__peer-title">{titleFor(p)}</span>
+                  <span className="admin-panel__peer-ip">{p.ipAddress}</span>
+                  {offline ? <span className="admin-panel__peer-pill">вне сети</span> : null}
+                </div>
+                <div className="admin-panel__peer-actions">
+                  {connected ? (
+                    <button
+                      type="button"
+                      className="admin-panel__btn-soft"
+                      disabled={savingConfiguration}
+                      onClick={() => void onDisconnect()}
+                    >
+                      Отключиться
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="admin-panel__btn-soft admin-panel__btn-soft--primary"
+                      disabled={savingConfiguration || !configuration}
+                      onClick={() => void onConnect(p.ipAddress)}
+                    >
+                      Подключиться
+                    </button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </>
+  );
+}
+
 export type AdminPanelViewProps = {
   open: boolean;
   activeTab: AdminPanelTab;
   onTabChange: (tab: AdminPanelTab) => void;
-  onOpenLanTab: () => void;
   baseUrl: string | null;
   backendLoadError: string | null;
   configuredRole: NetConfiguredRole | null;
@@ -48,7 +156,6 @@ export function AdminPanelView({
   open,
   activeTab,
   onTabChange,
-  onOpenLanTab,
   baseUrl,
   backendLoadError,
   configuredRole,
@@ -66,6 +173,17 @@ export function AdminPanelView({
   isConnectedToLanPeer,
   onConfigurationFieldChange,
 }: AdminPanelViewProps) {
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  const quickRefresh = () => {
+    void onRefreshPageInfo();
+    void onScanLanPeers();
+  };
+
+  useEffect(() => {
+    if (!open) setAdvancedOpen(false);
+  }, [open]);
+
   return (
     <>
       <div
@@ -75,46 +193,146 @@ export function AdminPanelView({
       <div
         className={`admin-panel ${open ? "admin-panel--open" : ""}`}
         role="region"
-        aria-label="Админ панель"
+        aria-label="Настройки сети"
         aria-hidden={!open}
       >
       <div className="admin-panel__scroll">
-        <h2 className="admin-panel__title">админ панель</h2>
+        <div className="admin-panel__title-row">
+          <div className="admin-panel__title-slot" />
+          <h2 className="admin-panel__title">сеть</h2>
+          <div className="admin-panel__title-actions">
+            {advancedOpen ? (
+              <button
+                type="button"
+                className="admin-panel__icon-btn admin-panel__icon-btn--text"
+                onClick={() => setAdvancedOpen(false)}
+              >
+                Свернуть
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="admin-panel__icon-btn"
+                onClick={() => {
+                  setAdvancedOpen(true);
+                  onTabChange("current");
+                }}
+                aria-label="Дополнительные настройки"
+                title="Дополнительные настройки"
+              >
+                <svg
+                  className="admin-panel__gear-icon"
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  aria-hidden
+                >
+                  <path
+                    fill="currentColor"
+                    d="M19.43 12.98c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5S10.07 8.5 12 8.5s3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
 
         {!baseUrl && !backendLoadError && <p className="muted">Загрузка backend…</p>}
+        {backendLoadError && <p className="muted">{backendLoadError}</p>}
 
-        <section className="admin-panel__menu admin-panel__card">
-          <button
-            type="button"
-            className={`admin-panel__menu-btn ${activeTab === "current" ? "admin-panel__menu-btn--active" : ""}`}
-            onClick={() => onTabChange("current")}
-          >
-            Текущая конфигурация
-          </button>
-          <button
-            type="button"
-            className={`admin-panel__menu-btn ${activeTab === "change" ? "admin-panel__menu-btn--active" : ""}`}
-            onClick={() => onTabChange("change")}
-          >
-            Смена конфигурации
-          </button>
-          <button
-            type="button"
-            className={`admin-panel__menu-btn ${activeTab === "lan" ? "admin-panel__menu-btn--active" : ""}`}
-            onClick={() => {
-              onTabChange("lan");
-              onOpenLanTab();
-            }}
-          >
-            LAN
-          </button>
-        </section>
+        {!advancedOpen && (
+          <>
+            <section className="card admin-panel__card">
+              <div className="row card-header-row">
+                <h2 className="admin-panel__section-title">Ваше имя в сети</h2>
+                <button
+                  type="button"
+                  className="btn-refresh"
+                  disabled={!baseUrl || !configuration || savingConfiguration}
+                  onClick={() => void onSaveConfiguration()}
+                >
+                  {savingConfiguration ? "Сохранение…" : "Сохранить"}
+                </button>
+              </div>
+              {!configuration ? (
+                <p className="muted">Загрузка…</p>
+              ) : (
+                <label className="admin-panel__field admin-panel__field--compact">
+                  <span className="admin-panel__hint-soft">
+                    Так вас увидят другие (латинские буквы и цифры).
+                  </span>
+                  <input
+                    type="text"
+                    value={configuration.instanceSlug}
+                    onChange={(e) => onConfigurationFieldChange("instanceSlug", e.target.value)}
+                    autoComplete="off"
+                    placeholder="например, офис-pc"
+                  />
+                </label>
+              )}
+            </section>
+
+            <section className="card admin-panel__card">
+              <div className="row card-header-row">
+                <h2 className="admin-panel__section-title">Обзор</h2>
+                <button
+                  type="button"
+                  className="btn-refresh"
+                  disabled={!baseUrl || refreshing || lanLoading}
+                  onClick={quickRefresh}
+                >
+                  {refreshing || lanLoading ? "Обновление…" : "Обновить"}
+                </button>
+              </div>
+              <p className="admin-panel__lede">{connectionSummary(net, configuredRole)}</p>
+              <p className="admin-panel__meta-line">
+                <span className="admin-panel__meta-label">Ваш адрес</span>
+                <span className="admin-panel__meta-value">
+                  {net?.thisHostIp?.trim() || "—"}
+                </span>
+              </p>
+            </section>
+
+            <section className="card admin-panel__card">
+              <LanPeersSimpleList
+                peers={lanPeersDisplay}
+                lanLoading={lanLoading}
+                baseUrl={baseUrl}
+                configuration={configuration}
+                savingConfiguration={savingConfiguration}
+                onScanLanPeers={onScanLanPeers}
+                onConnect={onConnect}
+                onDisconnect={onDisconnect}
+                isConnectedToLanPeer={isConnectedToLanPeer}
+              />
+            </section>
+          </>
+        )}
+
+        {advancedOpen && (
+          <>
+            <section className="admin-panel__menu admin-panel__card">
+              <button
+                type="button"
+                className={`admin-panel__menu-btn ${activeTab === "current" ? "admin-panel__menu-btn--active" : ""}`}
+                onClick={() => onTabChange("current")}
+              >
+                Статус
+              </button>
+              <button
+                type="button"
+                className={`admin-panel__menu-btn ${activeTab === "change" ? "admin-panel__menu-btn--active" : ""}`}
+                onClick={() => onTabChange("change")}
+              >
+                Все параметры
+              </button>
+            </section>
 
         {activeTab === "current" && (
           <>
             <section className="card admin-panel__card">
               <div className="row card-header-row">
-                <h2>Режим из конфигурации</h2>
+                <h2>Режим</h2>
                 <button
                   type="button"
                   className="btn-refresh"
@@ -125,17 +343,17 @@ export function AdminPanelView({
                 </button>
               </div>
               {configuredRole == null && baseUrl ? (
-                <p className="muted">Запрос /api/net/role…</p>
+                <p className="muted">Загрузка…</p>
               ) : configuredRole == null ? (
-                <p className="muted">Ожидание адреса backend…</p>
+                <p className="muted">Ожидание backend…</p>
               ) : (
                 <>
                   <p>
                     <strong>{roleLabel(configuredRole)}</strong>
                   </p>
                   <p className="hint">
-                    Роль host/client выставляется автоматически: по умолчанию хост; при выборе узла в
-                    вкладке LAN — клиент; отключение — снова хост.
+                    Обычно вы сами «хост»; при подключении к другому компьютеру из списка на главном
+                    экране включается режим клиента.
                   </p>
                 </>
               )}
@@ -143,27 +361,27 @@ export function AdminPanelView({
 
             {net && (
               <section className="card status admin-panel__card">
-                <h2>Статус discovery</h2>
-                <dl>
-                  <dt>configuredRole (из конфига)</dt>
+                <h2>Технический статус</h2>
+                <dl className="admin-panel__tech-dl">
+                  <dt>Роль</dt>
                   <dd>{net.configuredRole}</dd>
-                  <dt>state</dt>
+                  <dt>Состояние</dt>
                   <dd>{net.state}</dd>
-                  <dt>thisHostIp</dt>
+                  <dt>IP</dt>
                   <dd>{net.thisHostIp ?? "—"}</dd>
-                  <dt>remoteHostBaseUrl</dt>
+                  <dt>Удалённый узел</dt>
                   <dd>{net.remoteHostBaseUrl ?? "—"}</dd>
-                  <dt>UDP / LAN порты</dt>
+                  <dt>Порты UDP / LAN</dt>
                   <dd>
                     {net.udpPort} / {net.lanPort}
                   </dd>
-                  <dt>appId (beacon)</dt>
+                  <dt>Beacon</dt>
                   <dd>{net.appId}</dd>
-                  <dt>productSlug</dt>
-                  <dd>{net.productSlug || "—"}</dd>
-                  <dt>instanceSlug</dt>
-                  <dd>{net.instanceSlug || "—"}</dd>
-                  <dt>instanceGuid</dt>
+                  <dt>Продукт / экземпляр</dt>
+                  <dd>
+                    {net.productSlug || "—"} / {net.instanceSlug || "—"}
+                  </dd>
+                  <dt>GUID</dt>
                   <dd>{net.instanceGuid || "—"}</dd>
                 </dl>
               </section>
@@ -174,7 +392,7 @@ export function AdminPanelView({
         {activeTab === "change" && (
           <section className="card admin-panel__card">
             <div className="row card-header-row">
-              <h2>Изменение конфигурации</h2>
+              <h2>Все параметры</h2>
               <button
                 type="button"
                 className="btn-refresh"
@@ -188,10 +406,9 @@ export function AdminPanelView({
               <p className="muted">Загрузка текущей конфигурации…</p>
             ) : (
               <div className="admin-panel__form">
-                <p className="hint">
-                  Роль host/client выставляется только автоматически: по умолчанию хост; подключение к
-                  узлу из вкладки LAN — клиент; «Отключиться» там же — снова хост.
-                </p>
+              <p className="hint">
+                Роль «хост» / «клиент» меняется автоматически при подключении на главном экране.
+              </p>
                 <label className="admin-panel__field">
                   <span>Product slug (общий для линейки)</span>
                   <input
@@ -270,78 +487,7 @@ export function AdminPanelView({
           </section>
         )}
 
-        {activeTab === "lan" && (
-          <section className="card admin-panel__card">
-            <div className="row card-header-row">
-              <h2>Узлы в LAN (тот же productSlug)</h2>
-              <button
-                type="button"
-                className="btn-refresh"
-                disabled={!baseUrl || lanLoading}
-                onClick={() => void onScanLanPeers()}
-              >
-                {lanLoading ? "Сканирование…" : "Обновить"}
-              </button>
-            </div>
-            <p className="hint">
-              Формат beacon: <code>DLSv1-&lt;productSlug&gt;-&lt;instanceSlug&gt;</code>. Собственный узел в
-              списке не показывается. Текущее подключение остаётся в таблице даже без beacon (строка «нет
-              в эфире»), чтобы можно было отключиться. «Подключиться» / «Отключиться» — как раньше.
-            </p>
-            {lanLoading && lanPeersDisplay.length === 0 ? (
-              <p className="muted">Сканирование…</p>
-            ) : lanPeersDisplay.length === 0 ? (
-              <p className="muted">Узлы не найдены или список ещё не запрашивался.</p>
-            ) : (
-              <table className="admin-panel__table">
-                <thead>
-                  <tr>
-                    <th>IP</th>
-                    <th>Экземпляр</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {lanPeersDisplay.map((p) => (
-                    <tr
-                      key={
-                        p.seenInDiscovery === false
-                          ? `${p.ipAddress}__sticky`
-                          : `${p.ipAddress}-${p.beaconName}`
-                      }
-                    >
-                      <td>{p.ipAddress}</td>
-                      <td>
-                        <code>{p.instanceSlug}</code>
-                        <span className="muted"> ({p.beaconName})</span>
-                      </td>
-                      <td>
-                        {isConnectedToLanPeer(p.ipAddress) ? (
-                          <button
-                            type="button"
-                            className="btn-refresh"
-                            disabled={savingConfiguration}
-                            onClick={() => void onDisconnect()}
-                          >
-                            Отключиться
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="btn-refresh"
-                            disabled={savingConfiguration || !configuration}
-                            onClick={() => void onConnect(p.ipAddress)}
-                          >
-                            Подключиться
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </section>
+          </>
         )}
       </div>
     </div>

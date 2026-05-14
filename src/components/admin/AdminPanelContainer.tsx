@@ -5,7 +5,7 @@ import { isAdminToggle } from "./adminPanelShortcuts";
 
 export function AdminPanelContainer() {
   const store = useAdminNetStore();
-  const { open, setOpen, setActiveTab, scanLanPeers } = store;
+  const { open, setOpen, setActiveTab, scanLanPeers, baseUrl } = store;
 
   const toggle = useCallback(() => {
     setOpen((v) => !v);
@@ -21,16 +21,16 @@ export function AdminPanelContainer() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [toggle]);
 
-  const onOpenLanTab = useCallback(() => {
+  useEffect(() => {
+    if (!open || !baseUrl) return;
     void scanLanPeers();
-  }, [scanLanPeers]);
+  }, [open, baseUrl, scanLanPeers]);
 
   return (
     <AdminPanelView
       open={open}
       activeTab={store.activeTab}
       onTabChange={setActiveTab}
-      onOpenLanTab={onOpenLanTab}
       baseUrl={store.baseUrl}
       backendLoadError={store.backendLoadError}
       configuredRole={store.configuredRole}

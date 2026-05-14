@@ -22,7 +22,7 @@ import { mergeLanPeersWithStickyConnection } from "../domain/mergeLanPeers";
 import { useNotificationService } from "../services/NotificationServiceProvider";
 import { useBackendSession } from "./BackendSessionStore";
 
-export type AdminPanelTab = "current" | "change" | "lan";
+export type AdminPanelTab = "current" | "change";
 
 type AdminNetStoreValue = {
   baseUrl: string | null;
