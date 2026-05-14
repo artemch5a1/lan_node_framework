@@ -1,0 +1,2 @@
+# dotnet nuget update source rewrites credentials with indentation CSharpier rejects
+nuget.config

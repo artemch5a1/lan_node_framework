@@ -1,0 +1,46 @@
+name: .NET CI
+
+on:
+  push:
+  pull_request:
+
+env:
+  DOTNET_NO_LOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  dotnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore local tools
+        run: dotnet tool restore
+
+      - name: CSharpier (check only)
+        run: dotnet csharpier check .
+
+      - name: dotnet format (verify no changes)
+        run: dotnet format lan_node_framework.sln --verify-no-changes
+
+      - name: Authenticate to GitHub Packages (UdpDiscovery.Net)
+        run: >
+          dotnet nuget update source github
+          --username "${{ github.repository_owner }}"
+          --password "${{ secrets.NUGET_GITHUB_TOKEN }}"
+          --store-password-in-clear-text
+          --configfile "${{ github.workspace }}/nuget.config"
+
+      - name: Restore dependencies
+        run: dotnet restore lan_node_framework.sln
+
+      - name: Build
+        run: dotnet build lan_node_framework.sln --configuration Release --no-restore
+
+      - name: Unit tests
+        run: dotnet test lan_node_framework.sln --configuration Release --no-build --verbosity normal
