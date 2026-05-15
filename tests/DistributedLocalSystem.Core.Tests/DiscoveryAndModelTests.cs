@@ -1,5 +1,4 @@
 using System.Net;
-using System.Reflection;
 using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.NetDiscovery.Identity;
 using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
@@ -170,10 +169,17 @@ public class DiscoveryAndModelTests
     [Fact]
     public void NetDiscoveryService_TryGetHostProxyBaseUrl_ReturnsUrl_WhenClientIsConnected()
     {
-        NetDiscoveryService service = CreateService();
-        SetPrivateField(service, "_state", NetDiscoveryState.ClientConnected);
-        SetPrivateField(service, "_remoteHostIp", "192.168.1.25");
-        SetPrivateField(service, "_remoteTcpPort", 17891);
+        NetDiscoveryService service = CreateService(
+            new DiscoveryOptions
+            {
+                Role = "client",
+                RemoteHostIp = "192.168.1.25",
+                LanPort = 17891,
+                ProductSlug = "demo",
+                InstanceSlug = "app",
+            }
+        );
+        service.StartClient();
 
         bool success = service.TryGetHostProxyBaseUrl(out string? baseUrl);
 
@@ -216,15 +222,5 @@ public class DiscoveryAndModelTests
             _o = NetDiscoverySettingsDefaults.Clone(newDiscoveryOptions);
             return Task.FromResult(GetCurrent());
         }
-    }
-
-    private static void SetPrivateField<T>(object target, string fieldName, T value)
-    {
-        FieldInfo? field = target
-            .GetType()
-            .GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
-
-        Assert.NotNull(field);
-        field.SetValue(target, value);
     }
 }

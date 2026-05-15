@@ -1,10 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using DistributedLocalSystem.Application.Net.Internal;
 using DistributedLocalSystem.Core.Flow;
 using DistributedLocalSystem.Core.NetDiscovery.Model;
 
-namespace DistributedLocalSystem.Application.Net;
+namespace DistributedLocalSystem.Application.Net.Remote;
 
 /// <summary>HTTP-запрос конфигурации удалённого узла по LAN-порту.</summary>
 internal static class NetRemoteConfigurationProbe

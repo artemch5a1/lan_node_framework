@@ -1,33 +1,28 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Net;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
 using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.NetDiscovery.Identity;
 using DistributedLocalSystem.Core.NetDiscovery.Model;
 using DistributedLocalSystem.Infrastructure.Udp;
-using UdpDiscovery.Net;
+using Microsoft.Extensions.Logging;
 
 namespace DistributedLocalSystem.Infrastructure.NetDiscovery.Runtime;
 
-/// <summary>UDP discovery: хост — beacon, клиент — поиск хоста или <see cref="NetDiscoveryState.ClientLocalOnly"/>.</summary>
+/// <summary>Координация UDP discovery: делегирует запуск режимов узким компонентам.</summary>
 public sealed class NetDiscoveryService : INetDiscoveryRuntime
 {
     private readonly INetDiscoverySettingsRepository _settings;
-    private readonly DiscoveryServiceIdentity _localIdentity;
     private readonly ILogger<NetDiscoveryService> _log;
     private readonly object _gate = new();
 
+    private readonly NetDiscoveryLiveState _live = new();
+    private readonly NetDiscoveryBackgroundStopper _backgroundStopper;
+    private readonly NetDiscoveryHostModeStarter _hostStarter;
+    private readonly NetDiscoveryClientModeStarter _clientStarter;
+
     private CancellationTokenSource? _runCts;
     private Task? _runTask;
-
     private ApiUdpAnnouncer? _hostAnnouncer;
     private UdpDiscoveryService? _clientDiscovery;
-
-    private NetDiscoveryState _state = NetDiscoveryState.Idle;
-    private string? _remoteHostIp;
-    private int? _remoteTcpPort;
-    private string? _thisHostIp;
 
     public NetDiscoveryService(
         INetDiscoverySettingsRepository settings,
@@ -36,14 +31,12 @@ public sealed class NetDiscoveryService : INetDiscoveryRuntime
     )
     {
         _settings = settings;
-        _localIdentity = localIdentity;
         _log = log;
+        _backgroundStopper = new NetDiscoveryBackgroundStopper(log);
+        _hostStarter = new NetDiscoveryHostModeStarter(settings, localIdentity, log);
+        _clientStarter = new NetDiscoveryClientModeStarter(settings, localIdentity, log, _gate);
     }
 
-    /// <summary>
-    /// Останавливает discovery и поднимает режим по актуальным настройкам из репозитория
-    /// (после <see cref="INetDiscoveryConfigurationReloadCoordinator.ReloadAsync"/>).
-    /// </summary>
     public void RealignWithCurrentConfiguration()
     {
         Stop();
@@ -56,251 +49,58 @@ public sealed class NetDiscoveryService : INetDiscoveryRuntime
             case NetConfiguredRole.Client:
                 StartClient();
                 break;
-            default:
-                break;
         }
     }
 
     public async Task<DiscoveryOptions> ChangeConfiguration(
         DiscoveryOptions newDiscoveryOptions,
         CancellationToken cancellationToken = default
-    )
-    {
-        return await _settings.UpdateConfiguration(newDiscoveryOptions, cancellationToken);
-    }
+    ) => await _settings.UpdateConfiguration(newDiscoveryOptions, cancellationToken);
 
     public DiscoveryOptions GetCurrentConfiguration() => _settings.GetCurrent();
 
-    /// <summary>Снимок для <c>GET /api/net/status</c>.</summary>
     public NetStatusDto GetStatus()
     {
         lock (_gate)
         {
             DiscoveryOptions opt = _settings.GetCurrent();
-            return new NetStatusDto(
-                ConfiguredRole: opt.ParsedRole.ToApiString(),
-                State: _state,
-                ThisHostIp: _thisHostIp,
-                RemoteHostIp: _remoteHostIp,
-                RemoteTcpPort: _remoteTcpPort,
-                RemoteHostBaseUrl: BuildRemoteBaseUrl(),
-                LanPort: opt.LanPort,
-                UdpPort: opt.UdpPort,
-                ProductSlug: opt.ProductSlug,
-                InstanceSlug: opt.InstanceSlug,
-                InstanceGuid: opt.InstanceGuid,
-                LocalIpv4Endpoints: EnumerateLocalIpv4Endpoints(_thisHostIp)
+            return NetDiscoveryStatusSnapshotFactory.Create(
+                opt,
+                _live.State,
+                _live.ThisHostIp,
+                _live.Peer
             );
         }
     }
 
-    /// <summary>Режим хоста: периодический UDP beacon.</summary>
     public void StartHost()
     {
         lock (_gate)
         {
-            DiscoveryOptions opt = _settings.GetCurrent();
             StopUnsafe();
-
-            bool hostAlreadyExists = DetectExistingHostBeforeBeaconStart(opt);
-            if (hostAlreadyExists)
-            {
-                string error =
-                    $"Net: another host is already running in LAN for AppId '{opt.AppId}'. "
-                    + "This instance cannot start in host mode.";
-                _log.LogError(error);
-                throw new InvalidOperationException(error);
-            }
-
-            _state = NetDiscoveryState.HostBeaconing;
-            ClearRemotePeer();
-            _thisHostIp = GetPrimaryLanIPv4();
-
-            _runCts = new CancellationTokenSource();
-            CancellationToken token = _runCts.Token;
-
-            _hostAnnouncer = new ApiUdpAnnouncer(_settings, _localIdentity);
-            _hostAnnouncer.StartAsync(token).GetAwaiter().GetResult();
-
-            _runTask = Task.Run(
-                async () =>
-                {
-                    try
-                    {
-                        await Task.Delay(Timeout.InfiniteTimeSpan, token).ConfigureAwait(false);
-                    }
-                    catch (OperationCanceledException) { }
-                },
-                token
-            );
-
-            _log.LogInformation("Net: host mode, UDP announcement started ({AppId})", opt.AppId);
+            _hostStarter.Start(_live, ref _runCts, ref _runTask, ref _hostAnnouncer);
         }
     }
 
-    private bool DetectExistingHostBeforeBeaconStart(DiscoveryOptions opt)
-    {
-        using UdpDiscoveryService probe = new(
-            _settings,
-            _localIdentity,
-            LanUdpPeerFilterKind.ExactBeaconName
-        );
-        using CancellationTokenSource timeoutCts = new(
-            TimeSpan.FromMilliseconds(opt.DiscoveryTimeoutMs)
-        );
-
-        TaskCompletionSource<DiscoveredServer> tcs = new(
-            TaskCreationOptions.RunContinuationsAsynchronously
-        );
-        probe.ServerDiscovered += server => tcs.TrySetResult(server);
-
-        try
-        {
-            probe.StartAsync(timeoutCts.Token).GetAwaiter().GetResult();
-            DiscoveredServer discovered = tcs
-                .Task.WaitAsync(timeoutCts.Token)
-                .GetAwaiter()
-                .GetResult();
-            _log.LogInformation(
-                "Net: existing host detected before host startup at {Host}:{Tcp} ({AppId})",
-                discovered.IpAddress,
-                opt.LanPort,
-                opt.AppId
-            );
-            return true;
-        }
-        catch (OperationCanceledException)
-        {
-            return false;
-        }
-        catch (Exception ex)
-        {
-            _log.LogWarning(ex, "Net: host preflight discovery failed, continuing host startup");
-            return false;
-        }
-        finally
-        {
-            try
-            {
-                probe.StopAsync(CancellationToken.None).GetAwaiter().GetResult();
-            }
-            catch { }
-        }
-    }
-
-    /// <summary>Режим клиента: поиск до таймаута, иначе <see cref="NetDiscoveryState.ClientLocalOnly"/>.</summary>
     public void StartClient()
     {
         lock (_gate)
         {
-            DiscoveryOptions opt = _settings.GetCurrent();
             StopUnsafe();
-
-            _state = NetDiscoveryState.ClientDiscovering;
-            ClearRemotePeer();
-            _thisHostIp = GetPrimaryLanIPv4();
-
-            string? fixedIp = opt.RemoteHostIp?.Trim();
-            if (
-                !string.IsNullOrEmpty(fixedIp)
-                && IPAddress.TryParse(fixedIp, out IPAddress? parsedAddr)
-                && parsedAddr is not null
-            )
-            {
-                _state = NetDiscoveryState.ClientConnected;
-                _remoteHostIp = fixedIp;
-                _remoteTcpPort = opt.LanPort;
-                _log.LogInformation(
-                    "Net: client mode, fixed remote host {Host}:{Tcp} (no UDP discovery)",
-                    fixedIp,
-                    opt.LanPort
-                );
-                return;
-            }
-
-            _runCts = new CancellationTokenSource();
-            CancellationToken token = _runCts.Token;
-
-            UdpDiscoveryService discovery = new(
-                _settings,
-                _localIdentity,
-                LanUdpPeerFilterKind.SameProductSlug
-            );
-            _clientDiscovery = discovery;
-
-            TaskCompletionSource<DiscoveredServer> tcs = new(
-                TaskCreationOptions.RunContinuationsAsynchronously
-            );
-
-            discovery.ServerDiscovered += server => tcs.TrySetResult(server);
-
-            int lanPort = opt.LanPort;
-            string appId = opt.AppId;
-
-            _runTask = Task.Run(
-                async () =>
-                {
-                    try
-                    {
-                        await discovery.StartAsync(token).ConfigureAwait(false);
-
-                        DiscoveredServer server = await tcs
-                            .Task.WaitAsync(token)
-                            .ConfigureAwait(false);
-
-                        lock (_gate)
-                        {
-                            _state = NetDiscoveryState.ClientConnected;
-                            _remoteHostIp = server.IpAddress.ToString();
-                            _remoteTcpPort = lanPort;
-                        }
-
-                        _log.LogInformation(
-                            "Net: host found at {Host}:{Tcp} ({AppId})",
-                            server.IpAddress,
-                            lanPort,
-                            appId
-                        );
-
-                        await discovery.StopAsync(CancellationToken.None).ConfigureAwait(false);
-                    }
-                    catch (OperationCanceledException) { }
-                    catch (Exception ex)
-                    {
-                        _log.LogWarning(ex, "Net: client discovery error");
-                    }
-                },
-                token
-            );
-
-            _log.LogInformation(
-                "Net: client mode, listening UDP until host found ({AppId})",
-                opt.AppId
-            );
+            _clientStarter.Start(_live, ref _runCts, ref _runTask, ref _clientDiscovery);
         }
     }
 
-    /// <summary>Стоп фоновой задачи, состояние <see cref="NetDiscoveryState.Idle"/>.</summary>
     public void Stop()
     {
         lock (_gate)
         {
             StopUnsafe();
-            _state = NetDiscoveryState.Idle;
-            ClearRemotePeer();
+            _live.State = NetDiscoveryState.Idle;
+            _live.Peer.Clear();
         }
     }
 
-    private string? BuildRemoteBaseUrl()
-    {
-        if (string.IsNullOrEmpty(_remoteHostIp) || _remoteTcpPort is null or <= 0)
-            return null;
-        return $"http://{_remoteHostIp}:{_remoteTcpPort}";
-    }
-
-    /// <summary>
-    /// Удалённый хост не ответил на проверку <c>/health</c> после сбоя прокси — сброс связи и снова UDP discovery (только режим client).
-    /// </summary>
     public void RestartClientDiscoveryAfterRemoteHostFailure()
     {
         DiscoveryOptions snap = _settings.GetCurrent();
@@ -314,163 +114,28 @@ public sealed class NetDiscoveryService : INetDiscoveryRuntime
         StartClient();
     }
 
-    /// <summary>
-    /// Базовый URL LAN-хоста для проксирования HTTP (только <see cref="NetDiscoveryState.ClientConnected"/>).
-    /// </summary>
     public bool TryGetHostProxyBaseUrl([NotNullWhen(true)] out string? baseUrl)
     {
         lock (_gate)
         {
-            if (_state != NetDiscoveryState.ClientConnected)
+            if (_live.State != NetDiscoveryState.ClientConnected)
             {
                 baseUrl = null;
                 return false;
             }
 
-            baseUrl = BuildRemoteBaseUrl();
+            baseUrl = _live.Peer.BuildBaseUrl();
             return !string.IsNullOrEmpty(baseUrl);
         }
     }
 
-    private void ClearRemotePeer()
-    {
-        _remoteHostIp = null;
-        _remoteTcpPort = null;
-    }
-
-    private void StopUnsafe()
-    {
-        using CancellationTokenSource stopCts = new(TimeSpan.FromSeconds(2));
-        CancellationToken stopToken = stopCts.Token;
-
-        try
-        {
-            _runCts?.Cancel();
-        }
-        catch (Exception ex)
-        {
-            _log.LogDebug(ex, "Net: Cancel on shutdown");
-        }
-
-        try
-        {
-            _runTask?.Wait(TimeSpan.FromSeconds(2));
-        }
-        catch (Exception ex)
-        {
-            _log.LogDebug(ex, "Net: background task wait on shutdown");
-        }
-
-        try
-        {
-            _hostAnnouncer?.StopAsync(stopToken).GetAwaiter().GetResult();
-        }
-        catch { }
-        finally
-        {
-            _hostAnnouncer?.Dispose();
-            _hostAnnouncer = null;
-        }
-
-        try
-        {
-            _clientDiscovery?.StopAsync(stopToken).GetAwaiter().GetResult();
-        }
-        catch { }
-        finally
-        {
-            _clientDiscovery?.Dispose();
-            _clientDiscovery = null;
-        }
-
-        _runCts?.Dispose();
-        _runCts = null;
-        _runTask = null;
-    }
-
-    private string? GetPrimaryLanIPv4()
-    {
-        try
-        {
-            IPHostEntry host = Dns.GetHostEntry(Dns.GetHostName());
-            foreach (IPAddress a in host.AddressList)
-            {
-                if (!IsUsableLanIPv4(a))
-                    continue;
-                return a.ToString();
-            }
-        }
-        catch (Exception ex)
-        {
-            _log.LogDebug(ex, "Net: could not resolve primary LAN IPv4");
-        }
-
-        return null;
-    }
-
-    /// <summary>Все пригодные для LAN IPv4 на поднятых адаптерах; <paramref name="primaryAddressFirst"/> — в начале списка.</summary>
-    private IReadOnlyList<NetLocalIpv4Endpoint> EnumerateLocalIpv4Endpoints(
-        string? primaryAddressFirst
-    )
-    {
-        try
-        {
-            List<NetLocalIpv4Endpoint> items = new();
-            HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
-
-            foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
-            {
-                if (ni.OperationalStatus != OperationalStatus.Up)
-                    continue;
-
-                string label =
-                    !string.IsNullOrWhiteSpace(ni.Description) ? ni.Description.Trim()
-                    : !string.IsNullOrWhiteSpace(ni.Name) ? ni.Name.Trim()
-                    : "Сетевой адаптер";
-
-                foreach (UnicastIPAddressInformation u in ni.GetIPProperties().UnicastAddresses)
-                {
-                    if (!IsUsableLanIPv4(u.Address))
-                        continue;
-
-                    string addr = u.Address.ToString();
-                    if (!seen.Add(addr))
-                        continue;
-
-                    items.Add(new NetLocalIpv4Endpoint(addr, label));
-                }
-            }
-
-            if (!string.IsNullOrWhiteSpace(primaryAddressFirst))
-            {
-                int idx = items.FindIndex(e =>
-                    string.Equals(
-                        e.Address,
-                        primaryAddressFirst,
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                );
-                if (idx > 0)
-                {
-                    NetLocalIpv4Endpoint pick = items[idx];
-                    items.RemoveAt(idx);
-                    items.Insert(0, pick);
-                }
-            }
-
-            return items;
-        }
-        catch (Exception ex)
-        {
-            _log.LogDebug(ex, "Net: could not enumerate local LAN IPv4 endpoints");
-            return Array.Empty<NetLocalIpv4Endpoint>();
-        }
-    }
-
-    private static bool IsUsableLanIPv4(IPAddress a) =>
-        a.AddressFamily == AddressFamily.InterNetwork
-        && !IPAddress.IsLoopback(a)
-        && !a.ToString().StartsWith("169.254.", StringComparison.Ordinal);
+    private void StopUnsafe() =>
+        _backgroundStopper.Stop(
+            ref _runCts,
+            ref _runTask,
+            ref _hostAnnouncer,
+            ref _clientDiscovery
+        );
 
     public void Dispose() => Stop();
 }

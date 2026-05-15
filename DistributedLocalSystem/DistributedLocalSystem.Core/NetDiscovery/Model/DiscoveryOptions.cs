@@ -32,7 +32,8 @@ public sealed class DiscoveryOptions
     public int DiscoveryTimeoutMs { get; set; } = 5000;
     public int ProtocolVersion { get; set; } = 1;
 
-    public static NetConfiguredRole ParseRole(string? raw) => NetConfiguredRoleExtensions.ParseApiString(raw);
+    public static NetConfiguredRole ParseRole(string? raw) =>
+        NetConfiguredRoleExtensions.ParseApiString(raw);
 
     public NetConfiguredRole ParsedRole => NetConfiguredRoleExtensions.ParseApiString(Role);
 

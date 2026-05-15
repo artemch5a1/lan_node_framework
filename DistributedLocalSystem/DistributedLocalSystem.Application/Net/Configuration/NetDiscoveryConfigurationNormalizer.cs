@@ -1,7 +1,7 @@
 using System.Net;
 using DistributedLocalSystem.Core.NetDiscovery.Model;
 
-namespace DistributedLocalSystem.Application.Net;
+namespace DistributedLocalSystem.Application.Net.Configuration;
 
 /// <summary>
 /// Нормализация режима и полей конфигурации перед сохранением (раньше вызывалось из Infrastructure).

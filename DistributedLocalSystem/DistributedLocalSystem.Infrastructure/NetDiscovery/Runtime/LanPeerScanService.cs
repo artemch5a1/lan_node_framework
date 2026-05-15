@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Net;
 using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.NetDiscovery.Identity;
 using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
@@ -9,7 +8,7 @@ using UdpDiscovery.Net;
 
 namespace DistributedLocalSystem.Infrastructure.NetDiscovery.Runtime;
 
-/// <summary>Сканирование LAN: узлы с тем же <see cref="DiscoveryOptions.ProductSlug"/> (формат DLSv1).</summary>
+/// <summary>Сканирование LAN: UDP-сбор пиров и дополнение sticky-remote.</summary>
 public sealed class LanPeerScanService : ILanPeerScanService
 {
     private readonly INetDiscoverySettingsRepository _settings;
@@ -29,8 +28,22 @@ public sealed class LanPeerScanService : ILanPeerScanService
     )
     {
         DiscoveryOptions opt = _settings.GetCurrent();
-        List<LanPeerSnapshot> list = new();
+        IReadOnlyList<LanPeerSnapshot> discovered = await CollectFromUdpAsync(
+                opt,
+                cancellationToken
+            )
+            .ConfigureAwait(false);
 
+        List<LanPeerSnapshot> list = discovered.ToList();
+        StickyConnectedRemotePeerAppender.AppendIfMissing(list, opt);
+        return list;
+    }
+
+    private async Task<IReadOnlyList<LanPeerSnapshot>> CollectFromUdpAsync(
+        DiscoveryOptions opt,
+        CancellationToken cancellationToken
+    )
+    {
         string product = opt.ProductSlug.Trim();
         ConcurrentDictionary<string, LanPeerSnapshot> map = new(StringComparer.Ordinal);
 
@@ -40,7 +53,6 @@ public sealed class LanPeerScanService : ILanPeerScanService
                 return;
             if (!string.Equals(parsed.ProductSlug, product, StringComparison.Ordinal))
                 return;
-
             if (string.Equals(server.Name, _identity.ExpectedServiceName, StringComparison.Ordinal))
                 return;
 
@@ -68,46 +80,11 @@ public sealed class LanPeerScanService : ILanPeerScanService
         {
             await Task.Delay(ms, cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
-        {
-            // normal when caller cancels
-        }
+        catch (OperationCanceledException) { }
 
         await udp.StopAsync(CancellationToken.None).ConfigureAwait(false);
         udp.ServerDiscovered -= OnDiscovered;
 
-        list.AddRange(map.Values);
-
-        PrependStickyRemoteIfNeeded(list, opt);
-        return list;
-    }
-
-    /// <summary>
-    /// Текущее подключение client → remote: всегда показываем в списке, даже если beacon пропал.
-    /// </summary>
-    private static void PrependStickyRemoteIfNeeded(
-        List<LanPeerSnapshot> list,
-        DiscoveryOptions cur
-    )
-    {
-        if (cur.ParsedRole != NetConfiguredRole.Client)
-            return;
-
-        string? raw = cur.RemoteHostIp?.Trim();
-        if (string.IsNullOrEmpty(raw) || !IPAddress.TryParse(raw, out _))
-            return;
-
-        if (list.Exists(p => string.Equals(p.IpAddress, raw, StringComparison.Ordinal)))
-            return;
-
-        list.Insert(
-            0,
-            new LanPeerSnapshot(
-                raw,
-                cur.ProductSlug.Trim(),
-                "(нет в эфире)",
-                SeenInDiscovery: false
-            )
-        );
+        return map.Values.ToList();
     }
 }

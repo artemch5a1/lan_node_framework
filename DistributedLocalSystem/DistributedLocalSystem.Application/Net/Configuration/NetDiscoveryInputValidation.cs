@@ -3,7 +3,7 @@ using DistributedLocalSystem.Core.Flow;
 using DistributedLocalSystem.Core.NetDiscovery.LanBeacon;
 using DistributedLocalSystem.Core.NetDiscovery.Model;
 
-namespace DistributedLocalSystem.Application.Net;
+namespace DistributedLocalSystem.Application.Net.Configuration;
 
 /// <summary>Валидация входных данных LAN только на уровне Application.</summary>
 public static class NetDiscoveryInputValidation

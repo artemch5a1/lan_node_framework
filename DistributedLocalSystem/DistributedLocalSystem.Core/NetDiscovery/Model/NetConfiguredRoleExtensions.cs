@@ -14,7 +14,8 @@ public static class NetConfiguredRoleExtensions
             "client" => NetConfiguredRole.Client,
             _ => NetConfiguredRole.None,
         };
-        return role != NetConfiguredRole.None || string.Equals(raw?.Trim(), "none", StringComparison.OrdinalIgnoreCase);
+        return role != NetConfiguredRole.None
+            || string.Equals(raw?.Trim(), "none", StringComparison.OrdinalIgnoreCase);
     }
 
     public static NetConfiguredRole ParseApiString(string? raw) =>
@@ -39,7 +40,8 @@ public static class NetConfiguredRoleExtensions
         return string.IsNullOrWhiteSpace(fromAttribute) ? role.ToString() : fromAttribute;
     }
 
-    public static bool IsClientRole(this NetConfiguredRole role) => role == NetConfiguredRole.Client;
+    public static bool IsClientRole(this NetConfiguredRole role) =>
+        role == NetConfiguredRole.Client;
 
     /// <summary>Можно ли подключаться к этому экземпляру как к LAN-хосту.</summary>
     public static bool CanAcceptIncomingLanConnection(this NetConfiguredRole role) =>

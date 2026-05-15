@@ -1,4 +1,4 @@
-using DistributedLocalSystem.Application.Net;
+using DistributedLocalSystem.Application.Net.Configuration;
 using DistributedLocalSystem.Core.NetDiscovery.Model;
 
 namespace DistributedLocalSystem.Core.Tests;
