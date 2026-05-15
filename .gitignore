@@ -46,3 +46,4 @@ src-tauri/target/
 Thumbs.db
 /src-tauri/gen
 /src-tauri/binaries
+*.lscache
