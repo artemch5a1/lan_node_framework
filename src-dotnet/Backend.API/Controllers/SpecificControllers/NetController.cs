@@ -137,8 +137,10 @@ public sealed class NetController : ControllerBase
         CancellationToken cancellationToken
     )
     {
-        Outcome<ConnectByIpResult> outcome = await _net
-            .ConnectToRemoteHostByIpAsync(body.IpAddress ?? "", cancellationToken)
+        Outcome<ConnectByIpResult> outcome = await _net.ConnectToRemoteHostByIpAsync(
+                body.IpAddress ?? "",
+                cancellationToken
+            )
             .ConfigureAwait(false);
 
         if (outcome.IsFailure)

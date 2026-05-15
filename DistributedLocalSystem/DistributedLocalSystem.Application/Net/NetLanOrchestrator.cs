@@ -219,8 +219,7 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
         DiscoveryOptions? remoteCfg;
         try
         {
-            using HttpResponseMessage response = await http
-                .GetAsync(configUri, cancellationToken)
+            using HttpResponseMessage response = await http.GetAsync(configUri, cancellationToken)
                 .ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
@@ -231,8 +230,8 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
                 );
             }
 
-            remoteCfg = await response.Content
-                .ReadFromJsonAsync<DiscoveryOptions>(JsonProbeOptions, cancellationToken)
+            remoteCfg = await response
+                .Content.ReadFromJsonAsync<DiscoveryOptions>(JsonProbeOptions, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException)
@@ -319,9 +318,16 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
 
         NetConfigurationState saved = applyOutcome.Value;
         string remoteSlug = remoteCfg.InstanceSlug?.Trim() ?? "";
-        string instanceLabel = LanBeaconName.IsValidSlug(remoteSlug) ? remoteSlug : "удалённый узел";
+        string instanceLabel = LanBeaconName.IsValidSlug(remoteSlug)
+            ? remoteSlug
+            : "удалённый узел";
 
-        LanPeerSnapshot peer = new(canonicalIp, remoteProduct, instanceLabel, SeenInDiscovery: false);
+        LanPeerSnapshot peer = new(
+            canonicalIp,
+            remoteProduct,
+            instanceLabel,
+            SeenInDiscovery: false
+        );
 
         ConnectByIpResult result = new(saved.ToTransport(), peer);
         return Outcome<ConnectByIpResult>.Ok(result);

@@ -409,7 +409,9 @@ public sealed class NetDiscoveryService : INetDiscoveryRuntime
     }
 
     /// <summary>Все пригодные для LAN IPv4 на поднятых адаптерах; <paramref name="primaryAddressFirst"/> — в начале списка.</summary>
-    private IReadOnlyList<NetLocalIpv4Endpoint> EnumerateLocalIpv4Endpoints(string? primaryAddressFirst)
+    private IReadOnlyList<NetLocalIpv4Endpoint> EnumerateLocalIpv4Endpoints(
+        string? primaryAddressFirst
+    )
     {
         try
         {
@@ -422,11 +424,9 @@ public sealed class NetDiscoveryService : INetDiscoveryRuntime
                     continue;
 
                 string label =
-                    !string.IsNullOrWhiteSpace(ni.Description)
-                        ? ni.Description.Trim()
-                        : !string.IsNullOrWhiteSpace(ni.Name)
-                            ? ni.Name.Trim()
-                            : "Сетевой адаптер";
+                    !string.IsNullOrWhiteSpace(ni.Description) ? ni.Description.Trim()
+                    : !string.IsNullOrWhiteSpace(ni.Name) ? ni.Name.Trim()
+                    : "Сетевой адаптер";
 
                 foreach (UnicastIPAddressInformation u in ni.GetIPProperties().UnicastAddresses)
                 {
@@ -443,13 +443,12 @@ public sealed class NetDiscoveryService : INetDiscoveryRuntime
 
             if (!string.IsNullOrWhiteSpace(primaryAddressFirst))
             {
-                int idx = items.FindIndex(
-                    e =>
-                        string.Equals(
-                            e.Address,
-                            primaryAddressFirst,
-                            StringComparison.OrdinalIgnoreCase
-                        )
+                int idx = items.FindIndex(e =>
+                    string.Equals(
+                        e.Address,
+                        primaryAddressFirst,
+                        StringComparison.OrdinalIgnoreCase
+                    )
                 );
                 if (idx > 0)
                 {
