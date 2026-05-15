@@ -81,11 +81,20 @@ public class DiscoveryAndModelTests
     }
 
     [Fact]
-    public void NetRoleApi_Format_ReturnsExpectedString()
+    public void ToApiString_ReturnsExpectedString()
     {
-        string formatted = NetRoleApi.Format(NetConfiguredRole.Client);
+        string formatted = NetConfiguredRole.Client.ToApiString();
 
         Assert.Equal("client", formatted);
+    }
+
+    [Theory]
+    [InlineData(NetConfiguredRole.Host, "Хост (вещание в LAN)")]
+    [InlineData(NetConfiguredRole.Client, "Клиент (подключение к удалённому узлу)")]
+    [InlineData(NetConfiguredRole.None, "Выключен")]
+    public void GetDescription_ReturnsRussianLabel(NetConfiguredRole role, string expected)
+    {
+        Assert.Equal(expected, role.GetDescription());
     }
 
     [Fact]

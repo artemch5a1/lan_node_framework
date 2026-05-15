@@ -17,12 +17,12 @@ public static class NetDiscoveryConfigurationNormalizer
         string? ip = o.RemoteHostIp?.Trim();
         if (!string.IsNullOrEmpty(ip) && IPAddress.TryParse(ip, out _))
         {
-            o.Role = "client";
+            o.Role = NetConfiguredRole.Client.ToApiString();
             o.RemoteHostIp = ip;
             return;
         }
 
         o.RemoteHostIp = null;
-        o.Role = "host";
+        o.Role = NetConfiguredRole.Host.ToApiString();
     }
 }

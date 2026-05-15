@@ -11,7 +11,8 @@ namespace Backend.API.Controllers.SpecificControllers;
 /// <summary>
 /// Тело ответа <c>GET /api/net/role</c> (имя свойства сериализуется в camelCase).
 /// </summary>
-public sealed record NetRoleResponse(string Role);
+/// <param name="Label">Русскоязычная подпись режима (см. <see cref="NetConfiguredRole"/> и Description).</param>
+public sealed record NetRoleResponse(string Label);
 
 public sealed record ConnectByIpRequest(string? IpAddress);
 
@@ -163,6 +164,7 @@ public sealed class NetController : ControllerBase
             NetFlowErrorCodes.OperationCancelled => StatusCodes.Status400BadRequest,
             NetFlowErrorCodes.InvalidConfiguration => StatusCodes.Status400BadRequest,
             NetFlowErrorCodes.RemoteHostUnreachable => StatusCodes.Status400BadRequest,
+            NetFlowErrorCodes.RemoteHostIsClient => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError,
         };
 }

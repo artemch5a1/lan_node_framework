@@ -78,7 +78,7 @@ public sealed class NetDiscoveryService : INetDiscoveryRuntime
         {
             DiscoveryOptions opt = _settings.GetCurrent();
             return new NetStatusDto(
-                ConfiguredRole: NetRoleApi.Format(opt.ParsedRole),
+                ConfiguredRole: opt.ParsedRole.ToApiString(),
                 State: _state,
                 ThisHostIp: _thisHostIp,
                 RemoteHostIp: _remoteHostIp,

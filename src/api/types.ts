@@ -8,7 +8,8 @@ export type Book = {
 export type NetConfiguredRole = "none" | "host" | "client";
 
 export type NetRoleResponse = {
-  role: NetConfiguredRole;
+  /** Русскоязычная подпись режима (GET /api/net/role). */
+  label: string;
 };
 
 export type NetLocalIpv4Endpoint = {

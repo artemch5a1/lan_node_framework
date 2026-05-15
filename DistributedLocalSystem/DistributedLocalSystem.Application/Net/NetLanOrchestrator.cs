@@ -1,9 +1,7 @@
 using System.Net;
 using System.Net.Http;
-using System.Net.Http.Json;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Text.Json;
 using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.Domain.Net;
 using DistributedLocalSystem.Core.Flow;
@@ -17,14 +15,6 @@ namespace DistributedLocalSystem.Application.Net;
 /// </summary>
 public sealed class NetLanOrchestrator : INetLanOrchestrator
 {
-    private static readonly JsonSerializerOptions JsonProbeOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        ReadCommentHandling = JsonCommentHandling.Skip,
-        AllowTrailingCommas = true,
-    };
-
     private readonly INetDiscoveryRuntime _net;
     private readonly ILanPeerScanService _lanPeerScan;
     private readonly INetDiscoveryConfigurationReloadCoordinator _reloadCoordinator;
@@ -64,7 +54,10 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
     {
         try
         {
-            return Outcome<string>.Ok(_net.GetStatus().ConfiguredRole);
+            NetConfiguredRole role = NetConfiguredRoleExtensions.ParseApiString(
+                _net.GetStatus().ConfiguredRole
+            );
+            return Outcome<string>.Ok(role.GetDescription());
         }
         catch (Exception)
         {
@@ -143,6 +136,14 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
         if (!NetDiscoveryInputValidation.TryValidatePersist(transport, out NetFlowError? ve))
             return Outcome<NetConfigurationState>.Fail(ve!);
 
+        Outcome<bool>? remoteValidateOutcome = await TryValidateRemoteHostBeforeClientConnectAsync(
+                transport,
+                cancellationToken
+            )
+            .ConfigureAwait(false);
+        if (remoteValidateOutcome is { IsFailure: true } failedRemote)
+            return Outcome<NetConfigurationState>.Fail(failedRemote.Error);
+
         try
         {
             DiscoveryOptions updated = await _net.ChangeConfiguration(transport, cancellationToken)
@@ -213,64 +214,23 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
             return Outcome<ConnectByIpResult>.Fail(productError!);
 
         int port = current.LanPort;
-        Uri configUri = BuildRemoteConfigurationUri(parsedAddr, port);
-
         HttpClient http = _httpFactory.CreateClient("NetRemoteProbe");
-        DiscoveryOptions? remoteCfg;
-        try
-        {
-            using HttpResponseMessage response = await http.GetAsync(configUri, cancellationToken)
-                .ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-            {
-                return Outcome<ConnectByIpResult>.Fail(
-                    NetFlowErrorCodes.RemoteHostUnreachable,
-                    $"Сервер по адресу {canonicalIp} недоступен (HTTP {(int)response.StatusCode}). "
-                        + "Проверьте IP и что на том компьютере запущена та же программа."
-                );
-            }
+        Outcome<DiscoveryOptions> remoteOutcome = await NetRemoteConfigurationProbe.FetchAsync(
+                http,
+                parsedAddr,
+                port,
+                canonicalIp,
+                cancellationToken
+            )
+            .ConfigureAwait(false);
+        if (remoteOutcome.IsFailure)
+            return Outcome<ConnectByIpResult>.Fail(remoteOutcome.Error);
 
-            remoteCfg = await response
-                .Content.ReadFromJsonAsync<DiscoveryOptions>(JsonProbeOptions, cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            return Outcome<ConnectByIpResult>.Fail(
-                NetFlowErrorCodes.OperationCancelled,
-                "Операция отменена."
-            );
-        }
-        catch (HttpRequestException)
-        {
-            return Outcome<ConnectByIpResult>.Fail(
-                NetFlowErrorCodes.RemoteHostUnreachable,
-                $"Не удалось связаться с {canonicalIp}:{port}. "
-                    + "Убедитесь, что узел в сети и порт LAN совпадает с вашим."
-            );
-        }
-        catch (JsonException)
-        {
-            return Outcome<ConnectByIpResult>.Fail(
-                NetFlowErrorCodes.RemoteHostUnreachable,
-                "Удалённый узел ответил, но конфигурация не распознана. Версия приложения может отличаться."
-            );
-        }
-        catch (Exception)
-        {
-            return Outcome<ConnectByIpResult>.Fail(
-                NetFlowErrorCodes.Unexpected,
-                NetApiUserMessages.Unexpected
-            );
-        }
+        DiscoveryOptions remoteCfg = remoteOutcome.Value;
 
-        if (remoteCfg is null)
-        {
-            return Outcome<ConnectByIpResult>.Fail(
-                NetFlowErrorCodes.RemoteHostUnreachable,
-                "Пустой ответ конфигурации с удалённого узла."
-            );
-        }
+        Outcome<bool> remoteRoleOutcome = ValidateRemoteConnectTarget(remoteCfg);
+        if (remoteRoleOutcome.IsFailure)
+            return Outcome<ConnectByIpResult>.Fail(remoteRoleOutcome.Error);
 
         string localProduct = current.ProductSlug.Trim();
         string remoteProduct = (remoteCfg.ProductSlug ?? "").Trim();
@@ -333,15 +293,6 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
         return Outcome<ConnectByIpResult>.Ok(result);
     }
 
-    private static Uri BuildRemoteConfigurationUri(IPAddress addr, int lanPort)
-    {
-        string host =
-            addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6
-                ? $"[{addr}]"
-                : addr.ToString();
-        return new Uri($"http://{host}:{lanPort}/api/net/configuration");
-    }
-
     public async Task<Outcome<NetConfigurationState>> DisconnectFromAssignedRemoteAsync(
         CancellationToken cancellationToken
     )
@@ -349,7 +300,7 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
         DiscoveryOptions current = _net.GetCurrentConfiguration();
         DiscoveryOptions next = current.Clone();
         next.RemoteHostIp = null;
-        next.Role = "host";
+        next.Role = NetConfiguredRole.Host.ToApiString();
 
         NetDiscoveryConfigurationNormalizer.ApplyRoleFromRemoteHost(next);
 
@@ -382,6 +333,59 @@ public sealed class NetLanOrchestrator : INetLanOrchestrator
                 NetApiUserMessages.ConfigurationReloadAfterDisconnectFailed
             );
         }
+    }
+
+    /// <summary>
+    /// При переходе в client проверяет удалённый узел по HTTP.
+    /// <c>null</c> — проверка не требуется (режим host).
+    /// </summary>
+    private async Task<Outcome<bool>?> TryValidateRemoteHostBeforeClientConnectAsync(
+        DiscoveryOptions transport,
+        CancellationToken cancellationToken
+    )
+    {
+        if (!transport.ParsedRole.IsClientRole())
+            return null;
+
+        string? remoteIp = transport.RemoteHostIp?.Trim();
+        if (string.IsNullOrEmpty(remoteIp) || !IPAddress.TryParse(remoteIp, out IPAddress? remoteAddr))
+        {
+            return Outcome<bool>.Fail(
+                NetFlowErrorCodes.InvalidConfiguration,
+                "Укажите корректный IP удалённого хоста."
+            );
+        }
+
+        DiscoveryOptions current = _net.GetCurrentConfiguration();
+        HttpClient http = _httpFactory.CreateClient("NetRemoteProbe");
+        Outcome<DiscoveryOptions> remoteOutcome = await NetRemoteConfigurationProbe.FetchAsync(
+                http,
+                remoteAddr,
+                current.LanPort,
+                remoteAddr.ToString(),
+                cancellationToken
+            )
+            .ConfigureAwait(false);
+        if (remoteOutcome.IsFailure)
+            return Outcome<bool>.Fail(remoteOutcome.Error);
+
+        return ValidateRemoteConnectTarget(remoteOutcome.Value);
+    }
+
+    private static Outcome<bool> ValidateRemoteConnectTarget(DiscoveryOptions remoteConfiguration)
+    {
+        if (
+            NetRemoteConnectionValidation.TryValidateRemoteConnectTarget(
+                remoteConfiguration,
+                out string? userMessage
+            )
+        )
+            return Outcome<bool>.Ok(true);
+
+        return Outcome<bool>.Fail(
+            NetFlowErrorCodes.RemoteHostIsClient,
+            userMessage ?? NetRemoteConnectionValidation.RemoteIsClientMessage
+        );
     }
 
     private static bool IsConnectByIpTargetLocalMachine(IPAddress target, NetRuntimeSnapshot snap)

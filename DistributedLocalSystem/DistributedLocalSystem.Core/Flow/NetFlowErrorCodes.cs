@@ -16,4 +16,7 @@ public static class NetFlowErrorCodes
 
     /// <summary>Некорректные поля конфигурации / slug для сценария.</summary>
     public const string InvalidConfiguration = "NET_INVALID_CONFIGURATION";
+
+    /// <summary>Удалённый узел в режиме клиента и не принимает входящие подключения.</summary>
+    public const string RemoteHostIsClient = "NET_REMOTE_HOST_IS_CLIENT";
 }
