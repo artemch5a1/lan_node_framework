@@ -9,6 +9,7 @@ import {
   type ReactNode,
   type SetStateAction,
 } from "react";
+import { subscribeProxyChainRecovered } from "../api/backendFetch";
 import {
   fetchLanPeers,
   fetchNetConfiguration,
@@ -91,6 +92,14 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
     void loadStatus().catch((e) => notifications.showErrorFromUnknown(e));
     void loadConfiguration().catch((e) => notifications.showErrorFromUnknown(e));
   }, [baseUrl, loadStatus, loadConfiguration, notifications]);
+
+  useEffect(() => {
+    if (!baseUrl) return;
+    return subscribeProxyChainRecovered(() => {
+      void loadStatus().catch(() => {});
+      void loadConfiguration().catch(() => {});
+    });
+  }, [baseUrl, loadStatus, loadConfiguration]);
 
   useEffect(() => {
     if (!baseUrl) return;

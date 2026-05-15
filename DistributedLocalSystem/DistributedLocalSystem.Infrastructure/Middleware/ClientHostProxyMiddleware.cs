@@ -1,5 +1,7 @@
 using System.Net.Http.Headers;
+using System.Text.Json;
 using DistributedLocalSystem.Core.Abstractions;
+using DistributedLocalSystem.Core.Flow;
 using DistributedLocalSystem.Infrastructure.Attributes;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -57,6 +59,11 @@ public sealed class ClientHostProxyMiddleware(
 
     private readonly ClientHostProxyOptions _options = options.Value;
 
+    private static readonly JsonSerializerOptions ProxyChainJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
     public async Task InvokeAsync(HttpContext context, INetDiscoveryRuntime net)
     {
         if (ShouldSkipProxy(context))
@@ -71,7 +78,14 @@ public sealed class ClientHostProxyMiddleware(
             return;
         }
 
-        await ProxyRequestAsync(context, remoteBase, net).ConfigureAwait(false);
+        int incomingHop = ClientHostProxyHop.ReadIncomingHop(context.Request.Headers);
+        if (ClientHostProxyHop.ShouldRejectProxy(incomingHop, _options.MaxIncomingProxyHop))
+        {
+            await SendProxyChainRejectedResponseAsync(context).ConfigureAwait(false);
+            return;
+        }
+
+        await ProxyRequestAsync(context, remoteBase, net, incomingHop).ConfigureAwait(false);
     }
 
     #region Private Methods
@@ -129,12 +143,13 @@ public sealed class ClientHostProxyMiddleware(
     private async Task ProxyRequestAsync(
         HttpContext context,
         string remoteBase,
-        INetDiscoveryRuntime net
+        INetDiscoveryRuntime net,
+        int incomingHop
     )
     {
         try
         {
-            await ForwardToRemoteHostAsync(context, remoteBase).ConfigureAwait(false);
+            await ForwardToRemoteHostAsync(context, remoteBase, incomingHop).ConfigureAwait(false);
         }
         catch (Exception ex) when (IsTransportError(ex))
         {
@@ -142,10 +157,18 @@ public sealed class ClientHostProxyMiddleware(
         }
     }
 
-    private async Task ForwardToRemoteHostAsync(HttpContext context, string remoteBase)
+    private async Task ForwardToRemoteHostAsync(
+        HttpContext context,
+        string remoteBase,
+        int incomingHop
+    )
     {
         Uri targetUri = BuildTargetUri(context.Request, remoteBase);
-        using HttpRequestMessage requestMessage = CreateProxyRequest(context.Request, targetUri);
+        using HttpRequestMessage requestMessage = CreateProxyRequest(
+            context.Request,
+            targetUri,
+            incomingHop
+        );
 
         using HttpClient httpClient = _httpClientFactory.CreateClient("hostProxy");
         using HttpResponseMessage response = await httpClient
@@ -159,7 +182,11 @@ public sealed class ClientHostProxyMiddleware(
         await CopyResponseToContextAsync(context, response).ConfigureAwait(false);
     }
 
-    private static HttpRequestMessage CreateProxyRequest(HttpRequest request, Uri targetUri)
+    private static HttpRequestMessage CreateProxyRequest(
+        HttpRequest request,
+        Uri targetUri,
+        int incomingHop
+    )
     {
         HttpRequestMessage requestMessage = new HttpRequestMessage(
             new HttpMethod(request.Method),
@@ -167,6 +194,10 @@ public sealed class ClientHostProxyMiddleware(
         );
 
         CopyRequestHeaders(request, requestMessage);
+        requestMessage.Headers.TryAddWithoutValidation(
+            ClientHostProxyHop.HeaderName,
+            ClientHostProxyHop.NextOutgoingHop(incomingHop).ToString()
+        );
 
         if (RequestHasBody(request))
         {
@@ -192,7 +223,9 @@ public sealed class ClientHostProxyMiddleware(
 
     private static bool ShouldSkipRequestHeader(string headerKey)
     {
-        return HopByHopRequestHeaders.Contains(headerKey) || headerKey.StartsWith(':');
+        return HopByHopRequestHeaders.Contains(headerKey)
+            || string.Equals(headerKey, ClientHostProxyHop.HeaderName, StringComparison.OrdinalIgnoreCase)
+            || headerKey.StartsWith(':');
     }
 
     private static StreamContent CreateStreamContent(HttpRequest request)
@@ -325,6 +358,27 @@ public sealed class ClientHostProxyMiddleware(
         context.Response.StatusCode = StatusCodes.Status502BadGateway;
         await context
             .Response.WriteAsync("Bad gateway: host unreachable.", context.RequestAborted)
+            .ConfigureAwait(false);
+    }
+
+    private static async Task SendProxyChainRejectedResponseAsync(HttpContext context)
+    {
+        context.Response.StatusCode = StatusCodes.Status508LoopDetected;
+        context.Response.ContentType = "application/json; charset=utf-8";
+
+        var body = new
+        {
+            error = new
+            {
+                code = NetFlowErrorCodes.ProxyChainNotAllowed,
+                message =
+                    "Запрос уже прошёл через прокси удалённого узла. Цепочка проксирования запрещена. "
+                    + "Отключитесь от удалённого хоста и подключитесь напрямую к нужному узлу.",
+            },
+        };
+
+        await JsonSerializer
+            .SerializeAsync(context.Response.Body, body, ProxyChainJsonOptions, context.RequestAborted)
             .ConfigureAwait(false);
     }
 
