@@ -16,4 +16,9 @@ public class ClientHostProxyOptions
     /// Дополнительные проверки путей (регулярные выражения)
     /// </summary>
     public List<string> IgnoredPathPatterns { get; set; } = new();
+
+    /// <summary>
+    /// Отклонять проксирование, если <see cref="ClientHostProxyHop.HeaderName"/> &gt;= этого значения (1 = один hop).
+    /// </summary>
+    public int MaxIncomingProxyHop { get; set; } = ClientHostProxyHop.DefaultMaxIncomingHop;
 }

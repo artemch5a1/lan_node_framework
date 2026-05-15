@@ -19,4 +19,7 @@ public static class NetFlowErrorCodes
 
     /// <summary>Удалённый узел в режиме клиента и не принимает входящие подключения.</summary>
     public const string RemoteHostIsClient = "NET_REMOTE_HOST_IS_CLIENT";
+
+    /// <summary>Запрос уже прошёл через прокси; повторное проксирование запрещено.</summary>
+    public const string ProxyChainNotAllowed = "NET_PROXY_CHAIN_NOT_ALLOWED";
 }
