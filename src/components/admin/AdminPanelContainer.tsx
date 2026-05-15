@@ -44,6 +44,7 @@ export function AdminPanelContainer() {
       onScanLanPeers={store.scanLanPeers}
       onSaveConfiguration={store.saveConfiguration}
       onConnect={store.connectToLanPeer}
+      onConnectByManualIp={store.connectByManualIp}
       onDisconnect={store.disconnectFromRemoteHost}
       isConnectedToLanPeer={store.isConnectedToLanPeer}
       onConfigurationFieldChange={store.updateConfigurationField}

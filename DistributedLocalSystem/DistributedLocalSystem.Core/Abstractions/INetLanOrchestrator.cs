@@ -1,5 +1,6 @@
 using DistributedLocalSystem.Core.Domain.Net;
 using DistributedLocalSystem.Core.Flow;
+using DistributedLocalSystem.Core.NetDiscovery.Model;
 
 namespace DistributedLocalSystem.Core.Abstractions;
 
@@ -25,6 +26,11 @@ public interface INetLanOrchestrator
     );
 
     Task<Outcome<NetConfigurationState>> DisconnectFromAssignedRemoteAsync(
+        CancellationToken cancellationToken
+    );
+
+    Task<Outcome<ConnectByIpResult>> ConnectToRemoteHostByIpAsync(
+        string ipAddress,
         CancellationToken cancellationToken
     );
 }

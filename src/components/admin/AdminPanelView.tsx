@@ -42,6 +42,7 @@ function LanPeersSimpleList({
   savingConfiguration,
   onScanLanPeers,
   onConnect,
+  onConnectByManualIp,
   onDisconnect,
   isConnectedToLanPeer,
 }: {
@@ -52,9 +53,12 @@ function LanPeersSimpleList({
   savingConfiguration: boolean;
   onScanLanPeers: () => void;
   onConnect: (ip: string) => void;
+  onConnectByManualIp: (ip: string) => Promise<boolean>;
   onDisconnect: () => void;
   isConnectedToLanPeer: (ip: string) => boolean;
 }) {
+  const [manualIp, setManualIp] = useState("");
+
   function titleFor(p: LanPeerSnapshot): string {
     const slug = (p.instanceSlug ?? "").trim();
     return slug.length > 0 ? slug : "Компьютер в сети";
@@ -88,7 +92,9 @@ function LanPeersSimpleList({
             return (
               <li
                 key={
-                  offline ? `${p.ipAddress}__sticky` : `${p.ipAddress}-${p.beaconName}`
+                  offline
+                    ? `${p.ipAddress}__sticky`
+                    : `${p.ipAddress}-${p.beaconName || "beacon"}`
                 }
                 className={`admin-panel__peer-item${connected ? " admin-panel__peer-item--active" : ""}`}
               >
@@ -123,6 +129,37 @@ function LanPeersSimpleList({
           })}
         </ul>
       )}
+
+      <div className="admin-panel__manual-ip">
+        <p className="admin-panel__hint-soft admin-panel__manual-ip-title">
+          Не видите сервер в списке? Введите его IP — мы проверим узел и подключим.
+        </p>
+        <div className="admin-panel__manual-ip-row">
+          <input
+            type="text"
+            className="admin-panel__manual-ip-input"
+            placeholder="например, 192.168.1.10"
+            value={manualIp}
+            onChange={(e) => setManualIp(e.target.value)}
+            disabled={!baseUrl || savingConfiguration}
+            autoComplete="off"
+            inputMode="decimal"
+          />
+          <button
+            type="button"
+            className="admin-panel__btn-soft admin-panel__btn-soft--primary"
+            disabled={!baseUrl || savingConfiguration || !manualIp.trim()}
+            onClick={() =>
+              void (async () => {
+                const ok = await onConnectByManualIp(manualIp);
+                if (ok) setManualIp("");
+              })()
+            }
+          >
+            {savingConfiguration ? "Подключение…" : "Подключить по IP"}
+          </button>
+        </div>
+      </div>
     </>
   );
 }
@@ -144,6 +181,7 @@ export type AdminPanelViewProps = {
   onScanLanPeers: () => void;
   onSaveConfiguration: () => void;
   onConnect: (ip: string) => void;
+  onConnectByManualIp: (ip: string) => Promise<boolean>;
   onDisconnect: () => void;
   isConnectedToLanPeer: (ip: string) => boolean;
   onConfigurationFieldChange: <K extends keyof DiscoveryOptions>(
@@ -169,6 +207,7 @@ export function AdminPanelView({
   onScanLanPeers,
   onSaveConfiguration,
   onConnect,
+  onConnectByManualIp,
   onDisconnect,
   isConnectedToLanPeer,
   onConfigurationFieldChange,
@@ -285,12 +324,27 @@ export function AdminPanelView({
                 </button>
               </div>
               <p className="admin-panel__lede">{connectionSummary(net, configuredRole)}</p>
-              <p className="admin-panel__meta-line">
-                <span className="admin-panel__meta-label">Ваш адрес</span>
-                <span className="admin-panel__meta-value">
-                  {net?.thisHostIp?.trim() || "—"}
-                </span>
+              <p className="admin-panel__hint-soft admin-panel__hint-soft--below-lede">
+                Для подключения с другого ПК в обычной сети выберите адрес Wi‑Fi или Ethernet, а не
+                виртуального адаптера (VirtualBox, Hyper‑V и т.п.), если вы не в этой виртуальной сети.
               </p>
+              {net?.localIpv4Endpoints && net.localIpv4Endpoints.length > 0 ? (
+                <ul className="admin-panel__ip-list">
+                  {net.localIpv4Endpoints.map((e) => (
+                    <li key={e.address} className="admin-panel__ip-item">
+                      <span className="admin-panel__meta-value">{e.address}</span>
+                      <span className="admin-panel__hint-soft">{e.interfaceDescription}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="admin-panel__meta-line">
+                  <span className="admin-panel__meta-label">Ваш адрес</span>
+                  <span className="admin-panel__meta-value">
+                    {net?.thisHostIp?.trim() || "—"}
+                  </span>
+                </p>
+              )}
             </section>
 
             <section className="card admin-panel__card">
@@ -302,6 +356,7 @@ export function AdminPanelView({
                 savingConfiguration={savingConfiguration}
                 onScanLanPeers={onScanLanPeers}
                 onConnect={onConnect}
+                onConnectByManualIp={onConnectByManualIp}
                 onDisconnect={onDisconnect}
                 isConnectedToLanPeer={isConnectedToLanPeer}
               />
@@ -367,8 +422,23 @@ export function AdminPanelView({
                   <dd>{net.configuredRole}</dd>
                   <dt>Состояние</dt>
                   <dd>{net.state}</dd>
-                  <dt>IP</dt>
+                  <dt>IP (основной)</dt>
                   <dd>{net.thisHostIp ?? "—"}</dd>
+                  <dt>Локальные IPv4</dt>
+                  <dd>
+                    {net.localIpv4Endpoints?.length ? (
+                      <ul className="admin-panel__ip-list admin-panel__ip-list--inline">
+                        {net.localIpv4Endpoints.map((e) => (
+                          <li key={e.address} className="admin-panel__ip-item">
+                            <span className="admin-panel__meta-value">{e.address}</span>
+                            <span className="admin-panel__hint-soft">{e.interfaceDescription}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      "—"
+                    )}
+                  </dd>
                   <dt>Удалённый узел</dt>
                   <dd>{net.remoteHostBaseUrl ?? "—"}</dd>
                   <dt>Порты UDP / LAN</dt>

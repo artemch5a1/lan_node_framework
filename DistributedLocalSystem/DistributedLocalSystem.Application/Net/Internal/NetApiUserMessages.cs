@@ -1,4 +1,4 @@
-namespace DistributedLocalSystem.Application.Net;
+namespace DistributedLocalSystem.Application.Net.Internal;
 
 /// <summary>Краткие сообщения для клиента (рус.), без технических деталей исключений.</summary>
 internal static class NetApiUserMessages

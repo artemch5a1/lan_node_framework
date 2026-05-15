@@ -1,11 +1,12 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using DistributedLocalSystem.Application.Net;
+using DistributedLocalSystem.Application.Net.DependencyInjection;
 using DistributedLocalSystem.Core.Abstractions;
 using DistributedLocalSystem.Core.NetDiscovery.Identity;
 using DistributedLocalSystem.Infrastructure.Middleware;
 using DistributedLocalSystem.Infrastructure.NetDiscovery.Configuration;
+using DistributedLocalSystem.Infrastructure.NetDiscovery.Networking;
 using DistributedLocalSystem.Infrastructure.NetDiscovery.Runtime;
 using DistributedLocalSystem.Infrastructure.Persistence;
 using DistributedLocalSystem.Infrastructure.Persistence.Repositories;
@@ -51,8 +52,8 @@ public static class DistributedLocalSystemCoreExtensions
             INetDiscoveryConfigurationReloadCoordinator,
             NetDiscoveryConfigurationReloadCoordinator
         >();
-        services.AddSingleton<INetLanOrchestrator, NetLanOrchestrator>();
-        services.AddHostedService<NetDiscoveryHostedService>();
+        services.AddSingleton<ILocalMachineAddressMatcher, LocalMachineNetworkAddressMatcher>();
+        services.AddDistributedLocalSystemApplicationNet();
 
         services
             .AddHttpClient("hostProxy")
@@ -62,6 +63,19 @@ public static class DistributedLocalSystemCoreExtensions
                 {
                     AllowAutoRedirect = false,
                     UseCookies = false,
+                    AutomaticDecompression = DecompressionMethods.None,
+                }
+            );
+
+        services
+            .AddHttpClient("NetRemoteProbe")
+            .ConfigureHttpClient(static c => c.Timeout = TimeSpan.FromSeconds(8))
+            .ConfigurePrimaryHttpMessageHandler(static () =>
+                new SocketsHttpHandler
+                {
+                    AllowAutoRedirect = false,
+                    UseCookies = false,
+                    UseProxy = false,
                     AutomaticDecompression = DecompressionMethods.None,
                 }
             );

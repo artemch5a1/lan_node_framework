@@ -13,7 +13,8 @@ public sealed record NetStatusDto(
     int UdpPort,
     string ProductSlug,
     string InstanceSlug,
-    string InstanceGuid
+    string InstanceGuid,
+    IReadOnlyList<NetLocalIpv4Endpoint> LocalIpv4Endpoints
 )
 {
     /// <summary>Полное beacon-имя; не хранится отдельно.</summary>

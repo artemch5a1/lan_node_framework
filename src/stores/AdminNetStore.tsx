@@ -12,8 +12,8 @@ import {
 import {
   fetchLanPeers,
   fetchNetConfiguration,
-  fetchNetRole,
   fetchNetStatus,
+  postConnectByIp,
   postNetDisconnect,
   putNetConfiguration,
 } from "../api/netApi";
@@ -43,6 +43,7 @@ type AdminNetStoreValue = {
   isConnectedToLanPeer: (ip: string) => boolean;
   connectToLanPeer: (ip: string) => Promise<void>;
   disconnectFromRemoteHost: () => Promise<void>;
+  connectByManualIp: (ip: string) => Promise<boolean>;
   saveConfiguration: () => Promise<void>;
   updateConfigurationField: <K extends keyof DiscoveryOptions>(
     key: K,
@@ -65,22 +66,18 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
   const [savingConfiguration, setSavingConfiguration] = useState(false);
   const [lanPeers, setLanPeers] = useState<LanPeerSnapshot[]>([]);
   const [lanLoading, setLanLoading] = useState(false);
+  const [manualLanOverlay, setManualLanOverlay] = useState<LanPeerSnapshot | null>(null);
 
   const lanPeersDisplay = useMemo(
-    () => mergeLanPeersWithStickyConnection(lanPeers, net),
-    [lanPeers, net],
+    () => mergeLanPeersWithStickyConnection(lanPeers, net, manualLanOverlay),
+    [lanPeers, net, manualLanOverlay],
   );
-
-  const loadRole = useCallback(async () => {
-    if (!baseUrl) return;
-    const data = await fetchNetRole(baseUrl);
-    setConfiguredRole(data.role);
-  }, [baseUrl]);
 
   const loadStatus = useCallback(async () => {
     if (!baseUrl) return;
     const data = await fetchNetStatus(baseUrl);
     setNet(data);
+    setConfiguredRole(data.configuredRole);
   }, [baseUrl]);
 
   const loadConfiguration = useCallback(async () => {
@@ -91,9 +88,9 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!baseUrl) return;
-    void loadRole().catch((e) => notifications.showErrorFromUnknown(e));
+    void loadStatus().catch((e) => notifications.showErrorFromUnknown(e));
     void loadConfiguration().catch((e) => notifications.showErrorFromUnknown(e));
-  }, [baseUrl, loadRole, loadConfiguration, notifications]);
+  }, [baseUrl, loadStatus, loadConfiguration, notifications]);
 
   useEffect(() => {
     if (!baseUrl) return;
@@ -108,13 +105,13 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
     if (!baseUrl) return;
     setRefreshing(true);
     try {
-      await Promise.all([loadRole(), loadStatus()]);
+      await Promise.all([loadStatus()]);
     } catch (e) {
       notifications.showErrorFromUnknown(e);
     } finally {
       setRefreshing(false);
     }
-  }, [baseUrl, loadRole, loadStatus, notifications]);
+  }, [baseUrl, loadStatus, notifications]);
 
   const scanLanPeers = useCallback(async () => {
     if (!baseUrl) return;
@@ -130,7 +127,9 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
   }, [baseUrl, notifications]);
 
   const isConnectedToLanPeer = useCallback(
-    (ip: string) => net?.configuredRole === "client" && net?.remoteHostIp === ip,
+    (ip: string) =>
+      net?.configuredRole === "client" &&
+      (net?.remoteHostIp?.trim() ?? "") === (ip?.trim() ?? ""),
     [net],
   );
 
@@ -146,14 +145,15 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
         };
         const updated = await putNetConfiguration(baseUrl, body);
         setConfiguration(updated);
-        await Promise.all([loadRole(), loadStatus(), scanLanPeers()]);
+        setManualLanOverlay(null);
+        await Promise.all([loadStatus(), scanLanPeers()]);
       } catch (e) {
         notifications.showErrorFromUnknown(e);
       } finally {
         setSavingConfiguration(false);
       }
     },
-    [baseUrl, configuration, loadRole, loadStatus, scanLanPeers, notifications],
+    [baseUrl, configuration, loadStatus, scanLanPeers, notifications],
   );
 
   const disconnectFromRemoteHost = useCallback(async () => {
@@ -162,13 +162,14 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
     try {
       const updated = await postNetDisconnect(baseUrl);
       setConfiguration(updated);
-      await Promise.all([loadRole(), loadStatus(), scanLanPeers()]);
+      setManualLanOverlay(null);
+      await Promise.all([loadStatus(), scanLanPeers()]);
     } catch (e) {
       notifications.showErrorFromUnknown(e);
     } finally {
       setSavingConfiguration(false);
     }
-  }, [baseUrl, loadRole, loadStatus, scanLanPeers, notifications]);
+  }, [baseUrl, loadStatus, scanLanPeers, notifications]);
 
   const saveConfiguration = useCallback(async () => {
     if (!baseUrl || !configuration) return;
@@ -176,13 +177,13 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
     try {
       const updated = await putNetConfiguration(baseUrl, configuration);
       setConfiguration(updated);
-      await Promise.all([loadRole(), loadStatus()]);
+      await Promise.all([loadStatus()]);
     } catch (e) {
       notifications.showErrorFromUnknown(e);
     } finally {
       setSavingConfiguration(false);
     }
-  }, [baseUrl, configuration, loadRole, loadStatus, notifications]);
+  }, [baseUrl, configuration, loadStatus, notifications]);
 
   const updateConfigurationField = useCallback(
     <K extends keyof DiscoveryOptions>(key: K, value: DiscoveryOptions[K]) => {
@@ -190,6 +191,38 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+
+  const connectByManualIp = useCallback(async (ip: string): Promise<boolean> => {
+    if (!baseUrl) return false;
+    const trimmed = ip.trim();
+    if (!trimmed) return false;
+    setManualLanOverlay(null);
+    setSavingConfiguration(true);
+    try {
+      const result = await postConnectByIp(baseUrl, trimmed);
+      setConfiguration(result.configuration);
+      setManualLanOverlay({
+        ...result.peer,
+        beaconName: result.peer.beaconName || "—",
+        productSlug: result.peer.productSlug ?? "",
+        instanceSlug: result.peer.instanceSlug ?? "",
+        seenInDiscovery: result.peer.seenInDiscovery ?? false,
+      });
+      await Promise.all([loadStatus(), scanLanPeers()]);
+      return true;
+    } catch (e) {
+      setManualLanOverlay(null);
+      notifications.showErrorFromUnknown(e);
+      try {
+        await Promise.all([loadConfiguration(), loadStatus(), scanLanPeers()]);
+      } catch {
+        /* ignore resync errors */
+      }
+      return false;
+    } finally {
+      setSavingConfiguration(false);
+    }
+  }, [baseUrl, loadConfiguration, loadStatus, scanLanPeers, notifications]);
 
   const value: AdminNetStoreValue = useMemo(
     () => ({
@@ -211,6 +244,7 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
       isConnectedToLanPeer,
       connectToLanPeer,
       disconnectFromRemoteHost,
+      connectByManualIp,
       saveConfiguration,
       updateConfigurationField,
     }),
@@ -231,6 +265,7 @@ export function AdminNetStoreProvider({ children }: { children: ReactNode }) {
       isConnectedToLanPeer,
       connectToLanPeer,
       disconnectFromRemoteHost,
+      connectByManualIp,
       saveConfiguration,
       updateConfigurationField,
     ],

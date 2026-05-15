@@ -1,4 +1,10 @@
-import type { DiscoveryOptions, LanPeerSnapshot, NetRoleResponse, NetStatus } from "./types";
+import type {
+  ConnectByIpResult,
+  DiscoveryOptions,
+  LanPeerSnapshot,
+  NetRoleResponse,
+  NetStatus,
+} from "./types";
 import { parseNetErrorResponse } from "../services/notificationFormatting";
 
 async function assertOk(response: Response): Promise<void> {
@@ -15,7 +21,13 @@ export async function fetchNetRole(baseUrl: string): Promise<NetRoleResponse> {
 export async function fetchNetStatus(baseUrl: string): Promise<NetStatus> {
   const r = await fetch(`${baseUrl}/api/net/status`);
   await assertOk(r);
-  return (await r.json()) as NetStatus;
+  const raw = (await r.json()) as NetStatus;
+  return {
+    ...raw,
+    localIpv4Endpoints: Array.isArray(raw.localIpv4Endpoints)
+      ? raw.localIpv4Endpoints
+      : [],
+  };
 }
 
 export async function fetchNetConfiguration(baseUrl: string): Promise<DiscoveryOptions> {
@@ -48,4 +60,17 @@ export async function postNetDisconnect(baseUrl: string): Promise<DiscoveryOptio
   const r = await fetch(`${baseUrl}/api/net/disconnect`, { method: "POST" });
   await assertOk(r);
   return (await r.json()) as DiscoveryOptions;
+}
+
+export async function postConnectByIp(
+  baseUrl: string,
+  ipAddress: string,
+): Promise<ConnectByIpResult> {
+  const r = await fetch(`${baseUrl}/api/net/connect-by-ip`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ipAddress }),
+  });
+  await assertOk(r);
+  return (await r.json()) as ConnectByIpResult;
 }

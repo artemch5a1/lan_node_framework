@@ -8,7 +8,13 @@ export type Book = {
 export type NetConfiguredRole = "none" | "host" | "client";
 
 export type NetRoleResponse = {
-  role: NetConfiguredRole;
+  /** Русскоязычная подпись режима (GET /api/net/role). */
+  label: string;
+};
+
+export type NetLocalIpv4Endpoint = {
+  address: string;
+  interfaceDescription: string;
 };
 
 export type NetStatus = {
@@ -24,6 +30,8 @@ export type NetStatus = {
   productSlug: string;
   instanceSlug: string;
   instanceGuid: string;
+  /** Локальные IPv4 с подписью адаптера (для выбора адреса в реальной LAN). */
+  localIpv4Endpoints: NetLocalIpv4Endpoint[];
 };
 
 export type DiscoveryOptions = {
@@ -47,4 +55,9 @@ export type LanPeerSnapshot = {
   instanceSlug: string;
   /** false — сохранённое подключение, в эфире сейчас не видно */
   seenInDiscovery?: boolean;
+};
+
+export type ConnectByIpResult = {
+  configuration: DiscoveryOptions;
+  peer: LanPeerSnapshot;
 };

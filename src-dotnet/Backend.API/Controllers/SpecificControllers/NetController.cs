@@ -11,7 +11,10 @@ namespace Backend.API.Controllers.SpecificControllers;
 /// <summary>
 /// Тело ответа <c>GET /api/net/role</c> (имя свойства сериализуется в camelCase).
 /// </summary>
-public sealed record NetRoleResponse(string Role);
+/// <param name="Label">Русскоязычная подпись режима (см. <see cref="NetConfiguredRole"/> и Description).</param>
+public sealed record NetRoleResponse(string Label);
+
+public sealed record ConnectByIpRequest(string? IpAddress);
 
 /// <summary>
 /// API настройки LAN discovery: вызовы <see cref="INetLanOrchestrator"/> и перевод <see cref="Outcome{T}"/> в HTTP.
@@ -125,6 +128,28 @@ public sealed class NetController : ControllerBase
         return outcome.Value.ToTransport();
     }
 
+    [HttpPost("connect-by-ip")]
+    [ProducesResponseType(typeof(ConnectByIpResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<ConnectByIpResult>> ConnectByIp(
+        [FromBody] ConnectByIpRequest body,
+        CancellationToken cancellationToken
+    )
+    {
+        Outcome<ConnectByIpResult> outcome = await _net.ConnectToRemoteHostByIpAsync(
+                body.IpAddress ?? "",
+                cancellationToken
+            )
+            .ConfigureAwait(false);
+
+        if (outcome.IsFailure)
+            return NetFlowError(outcome.Error);
+
+        return outcome.Value;
+    }
+
     private ObjectResult NetFlowError(NetFlowError error) =>
         StatusCode(
             StatusCodeFor(error),
@@ -138,6 +163,8 @@ public sealed class NetController : ControllerBase
             NetFlowErrorCodes.AnotherHostAlreadyPresent => StatusCodes.Status409Conflict,
             NetFlowErrorCodes.OperationCancelled => StatusCodes.Status400BadRequest,
             NetFlowErrorCodes.InvalidConfiguration => StatusCodes.Status400BadRequest,
+            NetFlowErrorCodes.RemoteHostUnreachable => StatusCodes.Status400BadRequest,
+            NetFlowErrorCodes.RemoteHostIsClient => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status500InternalServerError,
         };
 }

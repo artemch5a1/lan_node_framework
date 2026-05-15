@@ -33,14 +33,9 @@ public sealed class DiscoveryOptions
     public int ProtocolVersion { get; set; } = 1;
 
     public static NetConfiguredRole ParseRole(string? raw) =>
-        raw?.Trim().ToLowerInvariant() switch
-        {
-            "host" => NetConfiguredRole.Host,
-            "client" => NetConfiguredRole.Client,
-            _ => NetConfiguredRole.None,
-        };
+        NetConfiguredRoleExtensions.ParseApiString(raw);
 
-    public NetConfiguredRole ParsedRole => ParseRole(Role);
+    public NetConfiguredRole ParsedRole => NetConfiguredRoleExtensions.ParseApiString(Role);
 
     /// <summary>Неглубокая копия полей для безопасной мутации без изменения исходного снимка.</summary>
     public DiscoveryOptions Clone() =>
@@ -56,23 +51,5 @@ public sealed class DiscoveryOptions
             BeaconIntervalMs = BeaconIntervalMs,
             DiscoveryTimeoutMs = DiscoveryTimeoutMs,
             ProtocolVersion = ProtocolVersion,
-        };
-}
-
-public enum NetConfiguredRole
-{
-    None,
-    Host,
-    Client,
-}
-
-public static class NetRoleApi
-{
-    public static string Format(NetConfiguredRole r) =>
-        r switch
-        {
-            NetConfiguredRole.Host => "host",
-            NetConfiguredRole.Client => "client",
-            _ => "none",
         };
 }
